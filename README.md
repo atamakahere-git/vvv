@@ -1,5 +1,4 @@
-
-# README.md
+![Reze from Chainsaw Man](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3hja2kyZ3NqdXFxZHlzMWowNXdxcWtpMzA3aW9hNGVuNngwcDZ4OCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/IKFVtPf8jP6KJH16dB/giphy.gif)
 
 # 💥 RUZE
 
@@ -97,5 +96,4 @@ All standard commands utilize the `~` prefix or can be invoked via Slash Command
 * `~start_bridge` — (*Owner/Admin Only*) Binds the active `linemux` log stream to the current Discord channel to initiate the live chat bridge.
 
 ```
-
 ```
