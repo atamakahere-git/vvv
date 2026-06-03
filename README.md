@@ -1,4 +1,4 @@
-![Reze from Chainsaw Man](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3hja2kyZ3NqdXFxZHlzMWowNXdxcWtpMzA3aW9hNGVuNngwcDZ4OCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/IKFVtPf8jP6KJH16dB/giphy.gif)
+<img src="https://i.pinimg.com/originals/5d/15/4b/5d154b68de57a87600fe9b98d692802c.gif" alt="Reze from Chainsaw Man" width="250"/>
 
 # 💥 RUZE
 
@@ -8,7 +8,7 @@ Unlike traditional bridges, RUZE uses direct log-tailing to read Minecraft serve
 
 ---
 
-## ✨ Features
+## Features
 
 * **Zero-Client Bridge:** Uses `linemux` to tail and parse local Minecraft server logs natively. No client mods, Forge, Fabric, or Paper plugins required!
 * **Live Chat Sync:** Forwards Minecraft in-game chat to Discord and vice versa.
@@ -18,7 +18,7 @@ Unlike traditional bridges, RUZE uses direct log-tailing to read Minecraft serve
 
 ---
 
-## 🛠️ Prerequisites & Server Configuration
+## Prerequisites & Server Configuration
 
 To allow RUZE to communicate with your Minecraft server, you must enable **RCON** (for sending Discord messages into Minecraft and querying player lists) and **Query** (for server status updates) in your Minecraft server's configuration.
 
@@ -42,7 +42,7 @@ query.port=25565
 
 ---
 
-## ⚙️ Required Environment Variables
+## Required Environment Variables
 
 RUZE requires a `.env` file in the root directory of the project to manage paths, API tokens, and security credentials securely. **All of the following variables must be configured for the bot to start.**
 
@@ -65,7 +65,7 @@ RCON_SERVER_ADDRESS=localhost:25575
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Enable Privileged Gateway Intents
 
@@ -86,7 +86,7 @@ cargo run --release
 
 ---
 
-## 📖 Bot Commands
+## Bot Commands
 
 All standard commands utilize the `~` prefix or can be invoked via Slash Commands.
 
