@@ -16,6 +16,9 @@ Unlike traditional bridges, RUZE uses direct log-tailing to read Minecraft serve
 * **Reze Aesthetics:** Includes beautifully styled, character-themed embeds and interactive help menus.
 * **Secure Access:** Features a custom validation gate restricting critical bridge management commands to the Bot Owner and Server Administrators.
 
+![RUZE USAGE EXAMPLE](images/discord.png)
+![RUZE USAGE EXAMPLE](images/minecraft.png)
+
 ---
 
 ## Prerequisites & Server Configuration
@@ -61,6 +64,9 @@ RCON_PASSWORD=your_secure_rcon_password_here
 # The IP and Port configuration for RCON (use localhost:25575 if hosted on the same machine)
 RCON_SERVER_ADDRESS=localhost:25575
 
+# Minecraft Server Query Address (use localhost:25565 if hosted on the same machine)
+MC_SERVER_QUERY_ADDRESS=localhost:25565
+
 ```
 
 ---
@@ -92,5 +98,6 @@ All standard commands utilize the `~` prefix or can be invoked via Slash Command
 
 * `~help` — Displays a beautiful, filtered menu of all available commands.
 * `~ping`  — Checks if the bot is alive and operational.
-* `~online_players`  —Query the Minecraft server and returns a clean list of all players currently active in-game.
+* `~info`  —Query the Minecraft server and returns a clean list of all players currently active in-game.
 * `~start_bridge` — (*Owner/Admin Only*) Binds the active `linemux` log stream to the current Discord channel to initiate the live chat bridge.
+* `_stop_bridge` — (*Owner/Admin Only*) Unbinds the log stream and halts all chat forwarding to the current channel.
