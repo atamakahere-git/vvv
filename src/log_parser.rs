@@ -48,37 +48,46 @@ const DEATH_PATTERNS: &[&str] = &[
     "was shot by",
     "was blown up by",
     "was smashed by",
+    "was impaled on",
     "was impaled by",
     "was pummeled by",
     "was skewered by",
-    "was spit at by",
     "was squashed by",
+    "was fireballed by",
+    "was speared by",
+    "was stung to death",
     "was poked to death",
     "was pricked to death",
     "was burned to a crisp",
     "was struck by lightning",
     "was frozen to death",
-    "struck by lightning",
+    "was obliterated",
+    "was roasted in dragon's breath",
+    "was killed",
     "burned to death",
     "went up in flames",
+    "went off with a bang",
     "drowned",
     "starved to death",
     "suffocated in a wall",
     "fell from a high place",
     "fell out of the world",
-    "fell off a ladder",
-    "fell off some vines",
+    "fell while climbing",
+    "fell off",
     "hit the ground too hard",
     "experienced kinetic energy",
     "didn't want to live",
     "was doomed to fall",
     "tried to swim in lava",
     "discovered the floor was lava",
+    "died because not just the floor is lava",
     "withered away",
     "killed by magic",
     "froze to death",
     "left the confines of this world",
     "was squished too much",
+    "blew up",
+    "walked into",
 ];
 
 const IGNORE_PATTERNS: &[&str] = &[
@@ -514,6 +523,190 @@ mod tests {
             MinecraftEvent::Death {
                 username: "TestPlayer".into(),
                 message: "fell from a high place".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_impaled_on_stalagmite() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer was impaled on a stalagmite";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "was impaled on a stalagmite".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_blew_up() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer blew up";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "blew up".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_fireballed() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer was fireballed by Ghast";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "was fireballed by Ghast".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_speared() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer was speared by Zombie";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "was speared by Zombie".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_stung() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer was stung to death";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "was stung to death".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_obliterated() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer was obliterated by a sonically-charged shriek";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "was obliterated by a sonically-charged shriek".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_roasted() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer was roasted in dragon's breath";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "was roasted in dragon's breath".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_went_off_with_a_bang() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer went off with a bang";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "went off with a bang".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_floor_is_lava() {
+        let line =
+            r"[12:00:01] [Server thread/INFO]: TestPlayer died because not just the floor is lava";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "died because not just the floor is lava".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_was_killed() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer was killed";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "was killed".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_fell_while_climbing() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer fell while climbing";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "fell while climbing".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_fell_off_scaffolding() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer fell off scaffolding";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "fell off scaffolding".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_walked_into_fire() {
+        let line =
+            r"[12:00:01] [Server thread/INFO]: TestPlayer walked into fire while fighting Zombie";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "walked into fire while fighting Zombie".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_death_walked_into_cactus() {
+        let line = r"[12:00:01] [Server thread/INFO]: TestPlayer walked into a cactus while trying to escape Zombie";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "TestPlayer".into(),
+                message: "walked into a cactus while trying to escape Zombie".into()
             }
         );
     }
