@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lint:
+    name: Clippy + fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets --all-features --locked -- -D warnings
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: lint
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            suffix: amd64
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            suffix: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary
+        run: strip target/${{ matrix.target }}/release/meow
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meow-linux-${{ matrix.suffix }}
+          path: target/${{ matrix.target }}/release/meow
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - run: |
+          cp artifacts/meow-linux-amd64/meow    meow-linux-amd64
+          cp artifacts/meow-linux-arm64/meow    meow-linux-arm64
+          chmod +x meow-linux-*
+          sha256sum meow-linux-* > checksums.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            meow-linux-amd64
+            meow-linux-arm64
+            checksums.txt
+          generate_release_notes: true
