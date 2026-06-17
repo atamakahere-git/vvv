@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use mc_rcon::RconClient;
-use rust_mc_status::McClient;
 use poise::serenity_prelude as serenity;
+use rust_mc_status::McClient;
 use tokio::sync::{Mutex, RwLock, mpsc::Sender};
 
 use crate::log_parser::{self, MinecraftEvent};

@@ -9,9 +9,9 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 
+use super::BotError;
 use super::commands;
 use super::types::{Data, FromDiscordEvent, FromMinecraftEvent};
-use super::BotError;
 
 /// Start the Discord bot, register commands, and begin dispatching events.
 ///

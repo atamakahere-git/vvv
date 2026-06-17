@@ -117,9 +117,7 @@ pub async fn info(ctx: Context<'_>) -> Result<(), BotError> {
         let clean_b64 = base64_data
             .strip_prefix("data:image/png;base64,")
             .unwrap_or(&base64_data);
-        if let Ok(image_bytes) =
-            base64::engine::general_purpose::STANDARD.decode(clean_b64)
-        {
+        if let Ok(image_bytes) = base64::engine::general_purpose::STANDARD.decode(clean_b64) {
             let attachment = serenity::CreateAttachment::bytes(image_bytes, "server_icon.png");
             reply = reply.attachment(attachment);
             embed = embed.thumbnail("attachment://server_icon.png");

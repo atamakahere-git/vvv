@@ -243,7 +243,9 @@ impl Config {
 
     fn validate(&self) -> Result<(), ConfigError> {
         if self.discord.token.is_empty() {
-            return Err(ConfigError::MissingField("discord.token / RUZE_DISCORD_TOKEN"));
+            return Err(ConfigError::MissingField(
+                "discord.token / RUZE_DISCORD_TOKEN",
+            ));
         }
         if self.log.path.is_empty() {
             return Err(ConfigError::MissingField("log.path / RUZE_LOG_PATH"));
@@ -276,8 +278,5 @@ fn xdg_config_path() -> String {
 }
 
 fn home_ruze_path() -> String {
-    home_dir()
-        .join(".ruze.toml")
-        .to_string_lossy()
-        .to_string()
+    home_dir().join(".ruze.toml").to_string_lossy().to_string()
 }

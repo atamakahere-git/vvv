@@ -26,8 +26,8 @@ async fn main() -> Result<(), bot::BotError> {
 
     tracing::info!("starting Ruze bridge...");
 
-    let config = consts::Config::load()
-        .inspect_err(|e| tracing::error!("configuration error: {e}"))?;
+    let config =
+        consts::Config::load().inspect_err(|e| tracing::error!("configuration error: {e}"))?;
 
     let (mc_event_tx, mc_event_rx) = mpsc::channel::<FromMinecraftEvent>(32);
     let (dc_event_tx, mut dc_event_rx) = mpsc::channel::<FromDiscordEvent>(32);
