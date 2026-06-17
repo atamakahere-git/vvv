@@ -107,6 +107,7 @@ pub async fn start_bot(
             for target_channel in targets {
                 let http_clone = Arc::clone(&cache_http);
                 let msg = formatted_message.clone();
+                let remove_list = Arc::clone(&bridge_channel_list_clone);
 
                 tokio::spawn(async move {
                     if let Err(why) = target_channel.say(http_clone, msg).await {
@@ -115,6 +116,18 @@ pub async fn start_bot(
                             error = %why,
                             "failed to forward Minecraft event to Discord"
                         );
+
+                        let error_msg = why.to_string();
+                        if error_msg.contains("Unknown Channel")
+                            || error_msg.contains("Missing Access")
+                        {
+                            let mut guard = remove_list.write().await;
+                            guard.retain(|c| *c != target_channel);
+                            tracing::info!(
+                                channel = %target_channel,
+                                "removed unreachable channel from bridge list"
+                            );
+                        }
                     }
                 });
             }

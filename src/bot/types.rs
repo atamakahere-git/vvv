@@ -65,9 +65,10 @@ impl MinecraftEvent {
             Self::ServerSay { message } => {
                 Some(pad_to_discord("📢", &format!("[Server] {message}")))
             }
-            Self::PlayerList { .. } | Self::ServerStart | Self::ServerStop | Self::SaveComplete => {
-                None
-            }
+            Self::ServerStart => Some(pad_to_discord("🚀", "Server started!")),
+            Self::ServerStop => Some(pad_to_discord("🛑", "Server stopped!")),
+            Self::SaveComplete => Some(pad_to_discord("💾", "World saved!")),
+            Self::PlayerList { .. } => None,
         }
     }
 }
