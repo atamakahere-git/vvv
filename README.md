@@ -24,15 +24,12 @@ Unlike traditional bridges, RUZE uses direct log-tailing to read Minecraft serve
 
 ## Minecraft Server Configuration
 
-Enable **RCON** (for sending Discord → Minecraft messages and querying player lists) and **Query** (for server status) in your Minecraft server's `server.properties`:
+Enable **RCON** (for sending Discord → Minecraft messages and querying player lists) in your Minecraft server's `server.properties`. Server List Ping (used by `/info` for MOTD and latency) works out-of-the-box on vanilla servers:
 
 ```properties
 enable-rcon=true
 rcon.port=25575
 rcon.password=your_secure_rcon_password_here
-
-enable-query=true
-query.port=25565
 ```
 
 Restart your Minecraft server after saving these changes.
@@ -68,7 +65,7 @@ address = "localhost:25575"
 password = "your_secure_rcon_password_here"
 
 [minecraft]
-# Minecraft server query address and port (default: "localhost:25565")
+# Minecraft server address and port for status pings (default: "localhost:25565")
 server_address = "localhost:25565"
 
 [bot]
