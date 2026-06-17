@@ -1,6 +1,11 @@
-use std::sync::LazyLock;
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
 
 use regex::Regex;
+
+/// Tracks recent disconnects so the subsequent "left the game" can be suppressed.
+static RECENT_DISCONNECTS: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, PartialEq)]
 pub enum MinecraftEvent {
@@ -241,6 +246,15 @@ fn try_leave(payload: &str) -> Option<MinecraftEvent> {
 
     let captures = REGEX.captures(payload)?;
     let username = captures.name("username")?.as_str().to_owned();
+
+    // Suppress "left the game" when a "lost connection" just preceded it.
+    if let Ok(mut map) = RECENT_DISCONNECTS.lock()
+        && map.remove(&username).is_some()
+    {
+        tracing::info!(%username, "suppressed leave after disconnect");
+        return None;
+    }
+
     tracing::info!(%username, "player left");
     Some(MinecraftEvent::Leave { username })
 }
@@ -254,6 +268,11 @@ fn try_disconnect(payload: &str) -> Option<MinecraftEvent> {
     let captures = REGEX.captures(payload)?;
     let username = captures.name("username")?.as_str().to_owned();
     let reason = captures.name("reason")?.as_str().to_owned();
+
+    if let Ok(mut map) = RECENT_DISCONNECTS.lock() {
+        map.insert(username.clone(), reason.clone());
+    }
+
     tracing::info!(%username, %reason, "player disconnected");
     Some(MinecraftEvent::Disconnect { username, reason })
 }
@@ -447,6 +466,18 @@ mod tests {
         let line = r"[12:00:01] [Server thread/INFO]: test_user lost connection: The same username is already playing on the server!";
         let event = parse_log_line(line).unwrap();
         assert!(matches!(event, MinecraftEvent::Disconnect { .. }));
+    }
+
+    #[test]
+    fn parse_leave_after_disconnect_is_suppressed() {
+        RECENT_DISCONNECTS.lock().unwrap().clear();
+
+        let dc_line = r"[00:52:15] [Server thread/INFO]: dedup_user lost connection: Test reason";
+        let event = parse_log_line(dc_line).unwrap();
+        assert!(matches!(event, MinecraftEvent::Disconnect { .. }));
+
+        let leave_line = r"[00:52:16] [Server thread/INFO]: dedup_user left the game";
+        assert!(parse_log_line(leave_line).is_none());
     }
 
     #[test]

@@ -53,7 +53,7 @@ impl MinecraftEvent {
             )),
             Self::Disconnect { username, reason } => Some(into_bridge_event(
                 "🔴",
-                &format!("**{username}** lost connection: {reason}"),
+                &format!("**{username}** left the game ({reason})"),
             )),
             Self::Death { username, message } => Some(into_bridge_event(
                 "⚰️",
