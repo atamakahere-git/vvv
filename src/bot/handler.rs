@@ -21,6 +21,7 @@ use super::BotError;
 pub async fn start_bot(
     token: String,
     owner_id: u64,
+    guild_id: Option<u64>,
     mc_server_address: String,
     mut mc_event_rx: Receiver<FromMinecraftEvent>,
     dc_event_tx: Sender<FromDiscordEvent>,
@@ -66,7 +67,14 @@ pub async fn start_bot(
         .setup(move |ctx, _ready, framework| {
             let addr = mc_server_address.clone();
             Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                let cmds = &framework.options().commands;
+                poise::builtins::register_globally(ctx, cmds).await?;
+
+                if let Some(gid) = guild_id {
+                    let guild = serenity::GuildId::new(gid);
+                    poise::builtins::register_in_guild(ctx, cmds, guild).await?;
+                    tracing::info!(guild_id = %gid, "slash commands registered in guild (instant sync)");
+                }
 
                 Ok(Data {
                     dc_event_tx,

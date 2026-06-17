@@ -74,6 +74,10 @@ server_address = "localhost:25565"
 [bot]
 # Discord user ID of the bot owner
 owner_id = 1314616785156444175
+# Optional: Discord guild (server) ID for instant slash command registration.
+# When set, commands appear immediately in this guild instead of waiting
+# for Discord's global sync (which can take up to an hour).
+# guild_id = 1234567890123456789
 
 [log]
 # Absolute path to the Minecraft server's latest.log file
@@ -92,6 +96,7 @@ Each TOML field has a corresponding `RUZE_*` environment variable. Use these for
 | `RUZE_RCON_ADDRESS` | `rcon.address` | No | `localhost:25575` |
 | `RUZE_MC_SERVER_ADDRESS` | `minecraft.server_address` | No | `localhost:25565` |
 | `RUZE_OWNER_ID` | `bot.owner_id` | Yes | — |
+| `RUZE_GUILD_ID` | `bot.guild_id` | No | — (instant slash cmd sync) |
 
 <details>
 <summary>Deprecated environment variable names</summary>

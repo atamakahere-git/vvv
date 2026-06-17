@@ -96,6 +96,7 @@ async fn main() -> Result<(), bot::BotError> {
     bot::handler::start_bot(
         config.discord.token,
         config.bot.owner_id,
+        config.bot.guild_id,
         config.minecraft.server_address,
         mc_event_rx,
         dc_event_tx,

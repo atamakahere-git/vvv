@@ -53,6 +53,10 @@ pub struct MinecraftConfig {
 #[derive(Debug, Deserialize)]
 pub struct BotConfig {
     pub owner_id: u64,
+    /// If set, slash commands are registered in this guild immediately
+    /// (instant sync) in addition to global registration.
+    #[serde(default)]
+    pub guild_id: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -120,7 +124,10 @@ impl Config {
             minecraft: MinecraftConfig {
                 server_address: default_mc_server_address(),
             },
-            bot: BotConfig { owner_id: 0 },
+            bot: BotConfig {
+                owner_id: 0,
+                guild_id: None,
+            },
             log: LogConfig {
                 path: String::new(),
             },
@@ -175,6 +182,9 @@ impl Config {
         if source.bot.owner_id != 0 {
             target.bot.owner_id = source.bot.owner_id;
         }
+        if source.bot.guild_id.is_some() {
+            target.bot.guild_id = source.bot.guild_id;
+        }
     }
 
     fn overlay_env(config: &mut Self) {
@@ -219,6 +229,14 @@ impl Config {
                 config.bot.owner_id = id;
             } else {
                 tracing::error!("RUZE_OWNER_ID is not a valid u64: {v}");
+            }
+        }
+
+        if let Ok(v) = std::env::var("RUZE_GUILD_ID") {
+            if let Ok(id) = v.parse::<u64>() {
+                config.bot.guild_id = Some(id);
+            } else {
+                tracing::error!("RUZE_GUILD_ID is not a valid u64: {v}");
             }
         }
     }
