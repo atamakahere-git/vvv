@@ -11,10 +11,13 @@ Unlike traditional bridges, RUZE uses direct log-tailing to read Minecraft serve
 ## Features
 
 - **Zero-Client Bridge** — Tails Minecraft server logs natively via `linemux`. No client mods, Forge, Fabric, or Paper plugins required.
-- **Live Chat Sync** — Forwards Minecraft in-game chat to Discord and vice versa.
-- **Server Events** — Death messages, advancements, and player join/leave formatted and beamed into Discord.
-- **Player List** — `/info` command queries the server and displays online players with latency.
-- **Structured Logging** — Full `tracing`-based observability with configurable verbosity (`RUST_LOG`).
+- **Live Chat Sync** — Forwards Minecraft in-game chat to Discord and vice versa, with JSON-safe escaping.
+- **Rich Server Events** — Deaths (95+ death message patterns), advancements, join/leave/disconnect, issued commands, server lifecycle (start/stop/save), and `/say` broadcasts all formatted and beamed into Discord.
+- **Leave Deduplication** — When a player disconnects with a reason, the generic follow-up "left the game" is suppressed to avoid duplicate messages.
+- **Persistent Bridge State** — Channel bindings survive bot restarts. Stored atomically via write-to-tmp-then-rename at `$XDG_DATA_HOME/ruze/bridge_state.toml`.
+- **Player Info** — `/info` queries the server via both RCON and Server List Ping, displaying online players, MOTD, latency, and the server icon.
+- **Guild Welcome** — Sends a themed embed message to the system channel when a new member joins the Discord server.
+- **Structured Logging** — Full `tracing`-based observability with RFC 3339 timestamps and configurable verbosity (`RUST_LOG`).
 - **Secure Access** — Critical bridge commands restricted to the Bot Owner and Server Administrators.
 
 ![RUZE USAGE EXAMPLE](images/discord.png)
@@ -196,11 +199,13 @@ All commands support both `~` prefix (`~ping`) and Slash Commands (`/ping`).
 |---------|--------|-------------|
 | `~help` | Everyone | List all commands or get detailed help for a specific one |
 | `~ping` | Everyone | Check if the bot is alive |
-| `~info` | Everyone | Query the Minecraft server for online players, MOTD, and latency |
-| `~start_bridge` | Owner/Admin | Bind the log stream to the current channel — live chat forwarding begins |
-| `~stop_bridge` | Owner/Admin | Unbind the log stream and halt chat forwarding to the current channel |
+| `~info` | Everyone | Query the server for online players, MOTD, latency, and server icon |
+| `~start_bridge` | Owner/Admin | Bind the log stream to the current channel — live chat and event forwarding begins |
+| `~stop_bridge` | Owner/Admin | Unbind the log stream and halt forwarding to the current channel |
 
 The bot also responds to `hey reze` and `hey reze,` as alternative prefixes.
+
+**Events forwarded to bridged channels:** chat messages, join/leave/disconnect, deaths, advancements, issued server commands, server-say broadcasts, and server lifecycle events (start, stop, save).
 
 ---
 
@@ -212,9 +217,10 @@ src/
   consts.rs        — Configuration loading (TOML + env vars, XDG paths)
   log_parser.rs    — Minecraft log line → structured event parsing
   rcon.rs          — RCON client connection & authentication
+  storage.rs       — Persistent bridge channel state (atomic TOML r/w)
   bot/
     mod.rs         — BotError enum, module docs
-    types.rs       — Data, FromDiscordEvent, FromMinecraftEvent
-    handler.rs     — Framework setup, event_handler, mc→dc forwarding
+    types.rs       — Data, FromDiscordEvent, FromMinecraftEvent, event → Discord formatting
+    handler.rs     — Framework setup, event_handler, mc→dc forwarding, welcome messages
     commands.rs    — All poise slash/prefix commands
 ```
