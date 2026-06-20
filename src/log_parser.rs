@@ -113,12 +113,25 @@ const IGNORE_PATTERNS: &[&str] = &[
     "was kicked due to",
 ];
 
+const PRIVATE_COMMAND_PATTERNS: &[&str] = &[
+    "/msg", "/tell", "/w", "/whisper",
+    "/reply", "/r",
+    "/teammsg", "/tm",
+    "/me",
+];
+
 fn is_death_message(payload: &str) -> bool {
     DEATH_PATTERNS.iter().any(|p| payload.contains(p))
 }
 
 fn is_ignorable_system_message(payload: &str) -> bool {
     IGNORE_PATTERNS.iter().any(|p| payload.contains(p))
+}
+
+fn is_private_command(command: &str) -> bool {
+    PRIVATE_COMMAND_PATTERNS
+        .iter()
+        .any(|&prefix| command == prefix || command.strip_prefix(prefix).is_some_and(|rest| rest.starts_with(' ')))
 }
 
 pub fn parse_log_line(line: &str) -> Option<MinecraftEvent> {
@@ -292,6 +305,10 @@ fn try_command(payload: &str) -> Option<MinecraftEvent> {
         return None;
     }
     let command = captures.name("command")?.as_str().to_owned();
+    if is_private_command(&command) {
+        tracing::debug!(%username, %command, "ignored private command");
+        return None;
+    }
     tracing::info!(%username, %command, "command event parsed");
     Some(MinecraftEvent::Command { username, command })
 }
