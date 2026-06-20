@@ -12,6 +12,7 @@ use tokio::sync::{
 use super::BotError;
 use super::commands;
 use super::types::{BotParams, Data, FromDiscordEvent, FromMinecraftEvent};
+use crate::log_parser::is_silent_message_prefix;
 
 /// Start the Discord bot, register commands, and begin dispatching events.
 ///
@@ -204,20 +205,33 @@ async fn event_handler(
             };
 
             if should_relay && new_message.author.id != ctx.cache.current_user().id {
-                data.dc_event_tx
-                    .send(FromDiscordEvent {
-                        username: new_message.author.name.clone(),
-                        content: new_message.content.clone(),
-                    })
-                    .await
-                    .inspect_err(|e| {
-                        tracing::warn!(
-                            user = %new_message.author.name,
-                            error = %e,
-                            "discord→mc event dropped"
-                        );
-                    })
-                    .ok();
+                let is_silent = is_silent_message_prefix(&new_message.content)
+                    || new_message.flags.is_some_and(|f| {
+                        f.contains(serenity::MessageFlags::SUPPRESS_NOTIFICATIONS)
+                    });
+
+                if is_silent {
+                    tracing::debug!(
+                        user = %new_message.author.name,
+                        content = %new_message.content,
+                        "ignored silent discord→mc message"
+                    );
+                } else {
+                    data.dc_event_tx
+                        .send(FromDiscordEvent {
+                            username: new_message.author.name.clone(),
+                            content: new_message.content.clone(),
+                        })
+                        .await
+                        .inspect_err(|e| {
+                            tracing::warn!(
+                                user = %new_message.author.name,
+                                error = %e,
+                                "discord→mc event dropped"
+                            );
+                        })
+                        .ok();
+                }
             }
         }
         _ => {}

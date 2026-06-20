@@ -114,10 +114,7 @@ const IGNORE_PATTERNS: &[&str] = &[
 ];
 
 const PRIVATE_COMMAND_PATTERNS: &[&str] = &[
-    "/msg", "/tell", "/w", "/whisper",
-    "/reply", "/r",
-    "/teammsg", "/tm",
-    "/me",
+    "/msg", "/tell", "/w", "/whisper", "/reply", "/r", "/teammsg", "/tm", "/me",
 ];
 
 fn is_death_message(payload: &str) -> bool {
@@ -129,9 +126,29 @@ fn is_ignorable_system_message(payload: &str) -> bool {
 }
 
 fn is_private_command(command: &str) -> bool {
-    PRIVATE_COMMAND_PATTERNS
-        .iter()
-        .any(|&prefix| command == prefix || command.strip_prefix(prefix).is_some_and(|rest| rest.starts_with(' ')))
+    PRIVATE_COMMAND_PATTERNS.iter().any(|&prefix| {
+        command == prefix
+            || command
+                .strip_prefix(prefix)
+                .is_some_and(|rest| rest.starts_with(' '))
+    })
+}
+
+const SILENT_PREFIXES: &[&str] = &["@silent", "@s"];
+
+/// DC→MC: checks if text starts with @silent or @s (exact or followed by space).
+pub fn is_silent_message_prefix(text: &str) -> bool {
+    SILENT_PREFIXES.iter().any(|&prefix| {
+        text.get(..prefix.len())
+            .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
+            && (text.len() == prefix.len() || text.as_bytes()[prefix.len()] == b' ')
+    })
+}
+
+/// MC→DC: checks if @s appears as a standalone token anywhere in the message.
+pub fn contains_silent_token(text: &str) -> bool {
+    text.split_whitespace()
+        .any(|w| w.eq_ignore_ascii_case("@s"))
 }
 
 pub fn parse_log_line(line: &str) -> Option<MinecraftEvent> {
@@ -194,6 +211,10 @@ fn try_chat(line: &str) -> Option<MinecraftEvent> {
     let captures = REGEX.captures(line)?;
     let username = captures.name("username")?.as_str().to_owned();
     let message = captures.name("message")?.as_str().to_owned();
+    if contains_silent_token(&message) {
+        tracing::debug!(%username, %message, "ignored silent chat message");
+        return None;
+    }
     tracing::debug!(%username, "chat event parsed");
     Some(MinecraftEvent::Chat { username, message })
 }
