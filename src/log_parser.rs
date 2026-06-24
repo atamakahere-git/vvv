@@ -243,6 +243,61 @@ fn extract_system_payload(line: &str) -> Option<&str> {
     captures.name("payload").map(|m| m.as_str())
 }
 
+fn try_mod_mob_death(payload: &str) -> Option<MinecraftEvent> {
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"^(?P<entity_type>[A-Za-z]+)\['(?P<custom_name>[^']*)'/(?P<entity_id>\d+),\s*uuid='(?P<uuid>[^']+)',\s*l='ServerLevel\[(?P<dimension>[^\]]+)\]',\s*x=(?P<x>-?[\d.]+),\s*y=(?P<y>-?[\d.]+),\s*z=(?P<z>-?[\d.]+).*\]\s+died,\s*message:\s*'(?P<death_msg>.+)'$",
+        )
+        .expect("valid static mod-death regex pattern")
+    });
+
+    let captures = REGEX.captures(payload)?;
+    let entity_type = captures.name("entity_type")?.as_str();
+    let custom_name = captures.name("custom_name")?.as_str();
+    let entity_id = captures.name("entity_id")?.as_str();
+    let dimension_raw = captures.name("dimension")?.as_str();
+    let x: f64 = captures.name("x")?.as_str().parse().ok()?;
+    let y: f64 = captures.name("y")?.as_str().parse().ok()?;
+    let z: f64 = captures.name("z")?.as_str().parse().ok()?;
+    let death_msg = captures.name("death_msg")?.as_str();
+
+    let dimension = match dimension_raw {
+        "world" => "overworld",
+        "world_nether" => "the nether",
+        "world_the_end" => "the end",
+        other => other,
+    };
+
+    let display_name = if custom_name.is_empty() {
+        entity_type.to_string()
+    } else {
+        format!("{custom_name} {entity_type}")
+    };
+
+    let trimmed = death_msg.trim();
+    let after_custom = if custom_name.is_empty() {
+        trimmed
+    } else {
+        trimmed.strip_prefix(custom_name).map_or(trimmed, str::trim)
+    };
+    let cleaned_msg = if let Some(rest) = after_custom.strip_prefix(entity_type) {
+        let rest = rest.trim();
+        if rest.is_empty() { after_custom } else { rest }
+    } else {
+        after_custom
+    };
+
+    let message = format!(
+        "(#{entity_id}) in **{dimension}** at **{x:.0}, {y:.0}, {z:.0}** {cleaned_msg}"
+    );
+
+    tracing::info!(%display_name, entity_id, "mod mob death event parsed");
+    Some(MinecraftEvent::Death {
+        username: display_name,
+        message,
+    })
+}
+
 fn try_death(payload: &str) -> Option<MinecraftEvent> {
     static EXTRACT: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"^(?P<username>[a-zA-Z0-9_]{3,16})\s(?P<message>.+)$")
@@ -251,6 +306,10 @@ fn try_death(payload: &str) -> Option<MinecraftEvent> {
 
     if !is_death_message(payload) {
         return None;
+    }
+
+    if let Some(event) = try_mod_mob_death(payload) {
+        return Some(event);
     }
 
     let captures = EXTRACT.captures(payload)?;
@@ -943,6 +1002,33 @@ mod tests {
     fn ignore_server_command_say() {
         let line = r"[Server thread/INFO]: SERVER issued server command: /say hi";
         assert!(parse_log_line(line).is_none());
+    }
+
+    #[test]
+    fn parse_mod_villager_death() {
+        let line = r"[12:00:01] [Server thread/INFO]: Villager['Librarian'/210034, uuid='f7f89d22-e84f-48e6-90a6-a63af8e3920e', l='ServerLevel[world]', x=4216.47, y=73.00, z=116.64, cpos=[263, 7], tl=17087, v=true] died, message: 'Librarian was slain by iamwho007'";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "Librarian Villager".into(),
+                message:
+                    "(#210034) in **overworld** at **4216, 73, 117** was slain by iamwho007".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_mod_villager_death_unnamed() {
+        let line = r"[12:00:01] [Server thread/INFO]: Villager[''/210034, uuid='f7f89d22-e84f-48e6-90a6-a63af8e3920e', l='ServerLevel[world]', x=100.0, y=64.0, z=200.0] died, message: 'Villager drowned'";
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::Death {
+                username: "Villager".into(),
+                message: "(#210034) in **overworld** at **100, 64, 200** drowned".into()
+            }
+        );
     }
 
     #[test]
