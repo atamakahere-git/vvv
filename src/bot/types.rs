@@ -78,7 +78,7 @@ impl MinecraftEvent {
             Self::ServerStart => Some(into_bridge_event("🚀", "Server started!")),
             Self::ServerStop => Some(into_bridge_event("🛑", "Server stopped!")),
             Self::SaveComplete => Some(into_bridge_event("💾", "World saved!")),
-            Self::PlayerList { .. } => None,
+            Self::PlayerList { .. } | Self::UuidResolved { .. } => None,
         }
     }
 }

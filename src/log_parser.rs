@@ -46,6 +46,12 @@ pub enum MinecraftEvent {
     ServerStart,
     ServerStop,
     SaveComplete,
+    /// Emitted when the server logs a player's UUID (on login/auth).
+    /// Not forwarded to Discord; used for stats tracking.
+    UuidResolved {
+        username: String,
+        uuid: String,
+    },
 }
 
 const DEATH_PATTERNS: &[&str] = &[
@@ -98,7 +104,6 @@ const DEATH_PATTERNS: &[&str] = &[
 const IGNORE_PATTERNS: &[&str] = &[
     "[Rcon:",
     "[AuthMe]",
-    "UUID of player",
     "Logged in with entity id",
     "Saving chunks for level",
     "Rcon connection from",
@@ -151,6 +156,82 @@ pub fn contains_silent_token(text: &str) -> bool {
         .any(|w| w.eq_ignore_ascii_case("@s"))
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum StatsEvent {
+    UuidResolved {
+        username: String,
+        uuid: String,
+    },
+    Join {
+        username: String,
+    },
+    Leave {
+        username: String,
+    },
+    Disconnect {
+        username: String,
+    },
+    Death {
+        username: String,
+    },
+    Advancement {
+        username: String,
+        advancement: String,
+    },
+    Chat {
+        username: String,
+    },
+    Command {
+        username: String,
+    },
+    ServerStart,
+    ServerStop,
+}
+
+impl MinecraftEvent {
+    /// Extract a lightweight stats event by borrowing `&self`.
+    ///
+    /// Called *before* `into_discord()` consumes the event, so the Discord
+    /// forwarding hot path is unaffected.
+    #[must_use]
+    pub fn to_stats_event(&self) -> Option<StatsEvent> {
+        match self {
+            Self::Chat { username, .. } => Some(StatsEvent::Chat {
+                username: username.clone(),
+            }),
+            Self::Join { username } => Some(StatsEvent::Join {
+                username: username.clone(),
+            }),
+            Self::Leave { username } => Some(StatsEvent::Leave {
+                username: username.clone(),
+            }),
+            Self::Disconnect { username, .. } => Some(StatsEvent::Disconnect {
+                username: username.clone(),
+            }),
+            Self::Death { username, .. } => Some(StatsEvent::Death {
+                username: username.clone(),
+            }),
+            Self::Advancement {
+                username,
+                advancement,
+            } => Some(StatsEvent::Advancement {
+                username: username.clone(),
+                advancement: advancement.clone(),
+            }),
+            Self::Command { username, .. } => Some(StatsEvent::Command {
+                username: username.clone(),
+            }),
+            Self::ServerStart => Some(StatsEvent::ServerStart),
+            Self::ServerStop => Some(StatsEvent::ServerStop),
+            Self::UuidResolved { username, uuid } => Some(StatsEvent::UuidResolved {
+                username: username.clone(),
+                uuid: uuid.clone(),
+            }),
+            Self::ServerSay { .. } | Self::PlayerList { .. } | Self::SaveComplete => None,
+        }
+    }
+}
+
 pub fn parse_log_line(line: &str) -> Option<MinecraftEvent> {
     if let Some(event) = try_chat(line) {
         return Some(event);
@@ -194,6 +275,9 @@ pub fn parse_log_line(line: &str) -> Option<MinecraftEvent> {
         return Some(event);
     }
     if let Some(event) = try_save_complete(payload) {
+        return Some(event);
+    }
+    if let Some(event) = try_uuid(payload) {
         return Some(event);
     }
 
@@ -438,6 +522,19 @@ fn try_player_list(payload: &str) -> Option<MinecraftEvent> {
         max,
         players,
     })
+}
+
+fn try_uuid(payload: &str) -> Option<MinecraftEvent> {
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^UUID of player (?P<username>[a-zA-Z0-9_]{3,16}) is (?P<uuid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$")
+            .expect("valid static uuid regex pattern")
+    });
+
+    let captures = REGEX.captures(payload)?;
+    let username = captures.name("username")?.as_str().to_owned();
+    let uuid = captures.name("uuid")?.as_str().to_owned();
+    tracing::debug!(%username, %uuid, "uuid resolved for player");
+    Some(MinecraftEvent::UuidResolved { username, uuid })
 }
 
 fn try_server_start(payload: &str) -> Option<MinecraftEvent> {
@@ -968,9 +1065,16 @@ mod tests {
     }
 
     #[test]
-    fn ignore_uuid_lookup() {
+    fn parse_uuid_resolved() {
         let line = r"[02:20:02] [User Authenticator #206/INFO]: UUID of player Vodka_not_Rum is 9e78961d-0a81-3dd7-b80f-d1abf718d3e8";
-        assert!(parse_log_line(line).is_none());
+        let event = parse_log_line(line).unwrap();
+        assert_eq!(
+            event,
+            MinecraftEvent::UuidResolved {
+                username: "Vodka_not_Rum".into(),
+                uuid: "9e78961d-0a81-3dd7-b80f-d1abf718d3e8".into(),
+            }
+        );
     }
 
     #[test]

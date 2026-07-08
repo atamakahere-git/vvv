@@ -10,6 +10,7 @@ mod bot;
 mod consts;
 mod log_parser;
 mod rcon;
+mod stats;
 mod storage;
 #[tokio::main]
 async fn main() -> Result<(), bot::BotError> {
@@ -31,6 +32,7 @@ async fn main() -> Result<(), bot::BotError> {
 
     let (mc_event_tx, mc_event_rx) = mpsc::channel::<FromMinecraftEvent>(32);
     let (dc_event_tx, dc_event_rx) = mpsc::channel::<FromDiscordEvent>(32);
+    let (stats_tx, stats_rx) = mpsc::channel::<log_parser::StatsEvent>(64);
 
     let log_path = config.log.path.clone();
 
@@ -50,17 +52,20 @@ async fn main() -> Result<(), bot::BotError> {
         }
 
         while let Ok(Some(line)) = lines_ok.next_line().await {
-            if let Some(event) = log_parser::parse_log_line(line.line()) {
-                let Some(discord_payload) = event.into_discord() else {
-                    continue;
-                };
-                tracing::info!(
-                    username = %discord_payload.username,
-                    "mc→dc"
-                );
-                if let Err(why) = mc_event_tx.send(discord_payload).await {
-                    tracing::warn!("mc→dc channel send failed: {why:?}");
-                }
+            let Some(event) = log_parser::parse_log_line(line.line()) else {
+                continue;
+            };
+
+            if let Some(stats_event) = event.to_stats_event()
+                && let Err(why) = stats_tx.send(stats_event).await
+            {
+                tracing::warn!("stats channel send failed: {why:?}");
+            }
+
+            if let Some(discord_payload) = event.into_discord()
+                && let Err(why) = mc_event_tx.send(discord_payload).await
+            {
+                tracing::warn!("mc→dc channel send failed: {why:?}");
             }
         }
     });
@@ -77,6 +82,16 @@ async fn main() -> Result<(), bot::BotError> {
         storage::Storage::open(&db_path, config.minecraft.server_address.clone())
             .inspect_err(|e| tracing::error!("failed to open storage: {e}"))?,
     );
+
+    let stats_timezone = consts::parse_timezone(&config.stats.timezone);
+    tracing::info!(timezone = %config.stats.timezone, "stats tracker timezone");
+    let stats_tracker = stats::StatsTracker::new(
+        Arc::clone(&storage),
+        stats_rx,
+        Arc::clone(&shared_rcon),
+        stats_timezone,
+    );
+    tokio::spawn(stats_tracker.run());
 
     let bot_params = BotParams {
         token: config.discord.token,

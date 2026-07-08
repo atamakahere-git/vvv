@@ -32,6 +32,8 @@ pub struct Config {
     pub log: LogConfig,
     #[serde(default, rename = "storage")]
     pub storage: StorageConfig,
+    #[serde(default, rename = "stats")]
+    pub stats: StatsConfig,
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +77,36 @@ pub struct StorageConfig {
     /// (falling back to `~/.local/state/ruze/ruze.redb`).
     #[serde(default)]
     pub database_path: Option<String>,
+}
+
+/// Player stats tracking configuration.
+#[derive(Debug, Deserialize)]
+pub struct StatsConfig {
+    /// IANA timezone name for daily play-time attribution (e.g. `"UTC"`,
+    /// `"Asia/Kolkata"`, `"America/New_York"`). Defaults to `"UTC"`.
+    #[serde(default = "default_stats_timezone")]
+    pub timezone: String,
+}
+
+impl Default for StatsConfig {
+    fn default() -> Self {
+        Self {
+            timezone: default_stats_timezone(),
+        }
+    }
+}
+
+fn default_stats_timezone() -> String {
+    "UTC".to_string()
+}
+
+/// Parse the configured timezone string into a `chrono_tz::Tz`, falling back
+/// to UTC with a warning on invalid input.
+pub fn parse_timezone(tz_str: &str) -> chrono_tz::Tz {
+    tz_str.parse::<chrono_tz::Tz>().unwrap_or_else(|_| {
+        tracing::warn!(timezone = tz_str, "invalid timezone, falling back to UTC");
+        chrono_tz::UTC
+    })
 }
 
 /// Error returned when configuration loading or validation fails.
@@ -145,6 +177,7 @@ impl Config {
                 path: String::new(),
             },
             storage: StorageConfig::default(),
+            stats: StatsConfig::default(),
         }
     }
 
@@ -205,6 +238,9 @@ impl Config {
                 .database_path
                 .clone_from(&source.storage.database_path);
         }
+        if source.stats.timezone != default_stats_timezone() {
+            target.stats.timezone.clone_from(&source.stats.timezone);
+        }
     }
 
     fn overlay_env(config: &mut Self) {
@@ -262,6 +298,10 @@ impl Config {
 
         if let Ok(v) = std::env::var("RUZE_DATABASE_PATH") {
             config.storage.database_path = Some(v);
+        }
+
+        if let Ok(v) = std::env::var("RUZE_STATS_TIMEZONE") {
+            config.stats.timezone = v;
         }
     }
 
