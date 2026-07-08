@@ -30,6 +30,8 @@ pub struct Config {
     pub bot: BotConfig,
     #[serde(rename = "log")]
     pub log: LogConfig,
+    #[serde(default, rename = "storage")]
+    pub storage: StorageConfig,
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,9 +61,20 @@ pub struct BotConfig {
     pub guild_id: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct LogConfig {
     pub path: String,
+}
+
+/// Optional storage configuration for the redb persistence backend.
+#[derive(Debug, Deserialize, Default)]
+pub struct StorageConfig {
+    /// Optional override for the redb database file path.
+    ///
+    /// When unset, the database is created at `$XDG_STATE_HOME/ruze/ruze.redb`
+    /// (falling back to `~/.local/state/ruze/ruze.redb`).
+    #[serde(default)]
+    pub database_path: Option<String>,
 }
 
 /// Error returned when configuration loading or validation fails.
@@ -131,6 +144,7 @@ impl Config {
             log: LogConfig {
                 path: String::new(),
             },
+            storage: StorageConfig::default(),
         }
     }
 
@@ -184,6 +198,9 @@ impl Config {
         }
         if source.bot.guild_id.is_some() {
             target.bot.guild_id = source.bot.guild_id;
+        }
+        if source.storage.database_path.is_some() {
+            target.storage.database_path.clone_from(&source.storage.database_path);
         }
     }
 
@@ -239,6 +256,10 @@ impl Config {
                 tracing::error!("RUZE_GUILD_ID is not a valid u64: {v}");
             }
         }
+
+        if let Ok(v) = std::env::var("RUZE_DATABASE_PATH") {
+            config.storage.database_path = Some(v);
+        }
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
@@ -270,9 +291,9 @@ fn xdg_config_home() -> PathBuf {
     std::env::var("XDG_CONFIG_HOME").map_or_else(|_| home_dir().join(".config"), PathBuf::from)
 }
 
-fn xdg_data_home() -> PathBuf {
-    std::env::var("XDG_DATA_HOME")
-        .map_or_else(|_| home_dir().join(".local").join("share"), PathBuf::from)
+fn xdg_state_home() -> PathBuf {
+    std::env::var("XDG_STATE_HOME")
+        .map_or_else(|_| home_dir().join(".local").join("state"), PathBuf::from)
 }
 
 fn xdg_config_path() -> String {
@@ -286,6 +307,20 @@ fn home_ruze_path() -> String {
     home_dir().join(".ruze.toml").to_string_lossy().to_string()
 }
 
-pub fn bridge_state_path() -> PathBuf {
-    xdg_data_home().join("ruze").join("bridge_state.toml")
+/// Default redb database location: `$XDG_STATE_HOME/ruze/ruze.redb`.
+pub fn default_db_path() -> PathBuf {
+    xdg_state_home().join("ruze").join("ruze.redb")
+}
+
+/// Resolve the redb database path from (highest → lowest priority):
+/// 1. `RUZE_DATABASE_PATH` env var (already overlaid onto `config.storage.database_path`)
+/// 2. `[storage] database_path` from config
+/// 3. `$XDG_STATE_HOME/ruze/ruze.redb` default
+pub fn resolve_db_path(config: &Config) -> PathBuf {
+    config
+        .storage
+        .database_path
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(default_db_path)
 }

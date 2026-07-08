@@ -17,6 +17,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "local-time"] 
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 url = "2"
+redb = "4.1"
 
 [lints.rust]
 nonstandard_style = "deny"
