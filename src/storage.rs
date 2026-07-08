@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -54,7 +55,7 @@ impl Storage {
     ///
     /// Returns `StorageError` if the parent directory cannot be created or the
     /// database cannot be opened.
-    pub fn open(path: PathBuf, mc_server_address: String) -> Result<Self, StorageError> {
+    pub fn open(path: &Path, mc_server_address: String) -> Result<Self, StorageError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| StorageError::Io {
                 path: parent.to_path_buf(),
@@ -63,7 +64,7 @@ impl Storage {
         }
 
         tracing::debug!(path = %path.display(), "opening redb database");
-        let db = Database::create(&path)?;
+        let db = Database::create(path)?;
 
         Ok(Self {
             db: Arc::new(db),
@@ -105,12 +106,17 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let mc_server_address = self.mc_server_address.clone();
         let db = Arc::clone(&self.db);
-        let result =
-            tokio::task::spawn_blocking(move || write_bridge(&db, channel_id, guild_id, &mc_server_address))
-                .await;
+        let result = tokio::task::spawn_blocking(move || {
+            write_bridge(&db, channel_id, guild_id, &mc_server_address)
+        })
+        .await;
         match result {
             Ok(Ok(())) => {
-                tracing::debug!(channel = channel_id, guild = guild_id, "bridge binding saved");
+                tracing::debug!(
+                    channel = channel_id,
+                    guild = guild_id,
+                    "bridge binding saved"
+                );
                 Ok(())
             }
             Ok(Err(e)) => {
@@ -169,7 +175,10 @@ fn write_bridge(
     let wtxn = db.begin_write()?;
     {
         let mut table = wtxn.open_table(BRIDGE)?;
-        table.insert(CURRENT, (channel_id, guild_id, mc_server_address.to_string()))?;
+        table.insert(
+            CURRENT,
+            (channel_id, guild_id, mc_server_address.to_string()),
+        )?;
     }
     wtxn.commit()?;
     Ok(())
@@ -186,9 +195,8 @@ fn remove_bridge(db: &Database) -> Result<(), StorageError> {
 }
 
 #[cfg(test)]
-fn open_test_storage(path: &std::path::Path) -> Storage {
-    Storage::open(path.to_path_buf(), "localhost:25565".to_string())
-        .expect("failed to open test storage")
+fn open_test_storage(path: &Path) -> Storage {
+    Storage::open(path, "localhost:25565".to_string()).expect("failed to open test storage")
 }
 
 #[cfg(test)]
@@ -238,10 +246,7 @@ mod tests {
             .set_bridge_channel(42, 99)
             .await
             .expect("write failed");
-        storage
-            .clear_bridge_channel()
-            .await
-            .expect("clear failed");
+        storage.clear_bridge_channel().await.expect("clear failed");
 
         let channel = storage.get_bridge_channel().await.expect("read failed");
         assert!(channel.is_none());

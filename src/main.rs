@@ -30,7 +30,7 @@ async fn main() -> Result<(), bot::BotError> {
         consts::Config::load().inspect_err(|e| tracing::error!("configuration error: {e}"))?;
 
     let (mc_event_tx, mc_event_rx) = mpsc::channel::<FromMinecraftEvent>(32);
-    let (dc_event_tx, mut dc_event_rx) = mpsc::channel::<FromDiscordEvent>(32);
+    let (dc_event_tx, dc_event_rx) = mpsc::channel::<FromDiscordEvent>(32);
 
     let log_path = config.log.path.clone();
 
@@ -67,52 +67,14 @@ async fn main() -> Result<(), bot::BotError> {
 
     let rcon_client = rcon::connect(&config.rcon.address, &config.rcon.password)?;
     let shared_rcon = Arc::new(Mutex::new(rcon_client));
-    let rcon_clone = Arc::clone(&shared_rcon);
 
-    tokio::spawn(async move {
-        tracing::info!("Discord → Minecraft relay started");
-
-        while let Some(event) = dc_event_rx.recv().await {
-            let safe_username: String = event
-                .username
-                .chars()
-                .map(|c| match c {
-                    '"' | '\\' => ' ',
-                    _ => c,
-                })
-                .collect();
-            let safe_content: String = event
-                .content
-                .chars()
-                .map(|c| match c {
-                    '"' | '\\' => ' ',
-                    _ => c,
-                })
-                .collect();
-            let formatted_command = format!(
-                r#"tellraw @a {{"text":"[Discord] <{safe_username}>: {safe_content}", "color":"gold"}}"#
-            );
-            let guard = rcon_clone.lock().await;
-            if let Err(why) = guard.send_command(&formatted_command) {
-                tracing::warn!(
-                    username = %event.username,
-                    error = %why,
-                    "dc→mc send failed"
-                );
-            } else {
-                tracing::info!(
-                    username = %event.username,
-                    "dc→mc"
-                );
-            }
-        }
-    });
+    spawn_dc_to_mc_relay(dc_event_rx, Arc::clone(&shared_rcon));
 
     tracing::info!("bridge is now running");
 
     let db_path = consts::resolve_db_path(&config);
     let storage = Arc::new(
-        storage::Storage::open(db_path, config.minecraft.server_address.clone())
+        storage::Storage::open(&db_path, config.minecraft.server_address.clone())
             .inspect_err(|e| tracing::error!("failed to open storage: {e}"))?,
     );
 
@@ -147,4 +109,48 @@ fn parse_mc_address(raw: &str) -> url::Url {
             "mc://localhost:25565".parse().expect("hardcoded URL")
         })
     }
+}
+
+fn spawn_dc_to_mc_relay(
+    mut dc_event_rx: mpsc::Receiver<FromDiscordEvent>,
+    rcon: Arc<Mutex<mc_rcon::RconClient>>,
+) {
+    tokio::spawn(async move {
+        tracing::info!("Discord → Minecraft relay started");
+
+        while let Some(event) = dc_event_rx.recv().await {
+            let safe_username: String = event
+                .username
+                .chars()
+                .map(|c| match c {
+                    '"' | '\\' => ' ',
+                    _ => c,
+                })
+                .collect();
+            let safe_content: String = event
+                .content
+                .chars()
+                .map(|c| match c {
+                    '"' | '\\' => ' ',
+                    _ => c,
+                })
+                .collect();
+            let formatted_command = format!(
+                r#"tellraw @a {{"text":"[Discord] <{safe_username}>: {safe_content}", "color":"gold"}}"#
+            );
+            let guard = rcon.lock().await;
+            if let Err(why) = guard.send_command(&formatted_command) {
+                tracing::warn!(
+                    username = %event.username,
+                    error = %why,
+                    "dc→mc send failed"
+                );
+            } else {
+                tracing::info!(
+                    username = %event.username,
+                    "dc→mc"
+                );
+            }
+        }
+    });
 }

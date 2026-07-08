@@ -129,8 +129,7 @@ pub async fn start_bot(
                     );
 
                     let error_msg = why.to_string();
-                    if error_msg.contains("Unknown Channel")
-                        || error_msg.contains("Missing Access")
+                    if error_msg.contains("Unknown Channel") || error_msg.contains("Missing Access")
                     {
                         let mut guard = bridge_ref.write().await;
                         *guard = None;

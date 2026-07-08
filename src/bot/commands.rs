@@ -168,7 +168,7 @@ pub async fn info(ctx: Context<'_>) -> Result<(), BotError> {
 )]
 pub async fn start_bridge(ctx: Context<'_>) -> Result<(), BotError> {
     let current_channel_id = ctx.channel_id();
-    let guild_id = ctx.guild_id().map(|g| g.get()).unwrap_or(0);
+    let guild_id = ctx.guild_id().map_or(0, serenity::GuildId::get);
 
     {
         let bridge = &ctx.data().bridge_channel;

@@ -200,7 +200,10 @@ impl Config {
             target.bot.guild_id = source.bot.guild_id;
         }
         if source.storage.database_path.is_some() {
-            target.storage.database_path.clone_from(&source.storage.database_path);
+            target
+                .storage
+                .database_path
+                .clone_from(&source.storage.database_path);
         }
     }
 
@@ -321,6 +324,5 @@ pub fn resolve_db_path(config: &Config) -> PathBuf {
         .storage
         .database_path
         .as_ref()
-        .map(PathBuf::from)
-        .unwrap_or_else(default_db_path)
+        .map_or_else(default_db_path, PathBuf::from)
 }

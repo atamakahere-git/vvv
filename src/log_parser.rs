@@ -287,9 +287,8 @@ fn try_mod_mob_death(payload: &str) -> Option<MinecraftEvent> {
         after_custom
     };
 
-    let message = format!(
-        "(#{entity_id}) in **{dimension}** at **{x:.0}, {y:.0}, {z:.0}** {cleaned_msg}"
-    );
+    let message =
+        format!("(#{entity_id}) in **{dimension}** at **{x:.0}, {y:.0}, {z:.0}** {cleaned_msg}");
 
     tracing::info!(%display_name, entity_id, "mod mob death event parsed");
     Some(MinecraftEvent::Death {
@@ -1012,8 +1011,8 @@ mod tests {
             event,
             MinecraftEvent::Death {
                 username: "Librarian Villager".into(),
-                message:
-                    "(#210034) in **overworld** at **4216, 73, 117** was slain by iamwho007".into()
+                message: "(#210034) in **overworld** at **4216, 73, 117** was slain by iamwho007"
+                    .into()
             }
         );
     }
