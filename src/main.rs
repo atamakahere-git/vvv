@@ -11,7 +11,6 @@ mod consts;
 mod log_parser;
 mod rcon;
 mod storage;
-
 #[tokio::main]
 async fn main() -> Result<(), bot::BotError> {
     tracing_subscriber::fmt()
@@ -111,6 +110,12 @@ async fn main() -> Result<(), bot::BotError> {
 
     tracing::info!("bridge is now running");
 
+    let db_path = consts::resolve_db_path(&config);
+    let storage = Arc::new(
+        storage::Storage::open(db_path, config.minecraft.server_address.clone())
+            .inspect_err(|e| tracing::error!("failed to open storage: {e}"))?,
+    );
+
     let bot_params = BotParams {
         token: config.discord.token,
         owner_id: config.bot.owner_id,
@@ -123,6 +128,7 @@ async fn main() -> Result<(), bot::BotError> {
         mc_event_rx,
         dc_event_tx,
         shared_rcon,
+        storage,
     )
     .await?;
 

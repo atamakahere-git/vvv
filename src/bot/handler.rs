@@ -13,6 +13,7 @@ use super::BotError;
 use super::commands;
 use super::types::{BotParams, Data, FromDiscordEvent, FromMinecraftEvent};
 use crate::log_parser::is_silent_message_prefix;
+use crate::storage::Storage;
 
 /// Start the Discord bot, register commands, and begin dispatching events.
 ///
@@ -26,16 +27,19 @@ pub async fn start_bot(
     mut mc_event_rx: Receiver<FromMinecraftEvent>,
     dc_event_tx: Sender<FromDiscordEvent>,
     rcon_client: Arc<Mutex<RconClient>>,
+    storage: Arc<Storage>,
 ) -> Result<(), BotError> {
     let intents =
         serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
 
-    let initial_channels = crate::storage::load_channels()
+    let initial_channel = storage
+        .get_bridge_channel()
         .await
-        .inspect_err(|e| tracing::warn!(%e, "failed to load bridge state, starting fresh"))
-        .unwrap_or_default();
-    let bridge_channel_list = Arc::new(RwLock::new(initial_channels));
-    let bridge_channel_list_clone = Arc::clone(&bridge_channel_list);
+        .inspect_err(|e| tracing::warn!(%e, "failed to load bridge binding, starting fresh"))
+        .unwrap_or(None);
+    let bridge_channel = Arc::new(RwLock::new(initial_channel));
+    let bridge_channel_clone = Arc::clone(&bridge_channel);
+    let storage_for_forward = Arc::clone(&storage);
 
     let mc_status_client = McClient::new()
         .with_timeout(Duration::from_secs(5))
@@ -85,7 +89,8 @@ pub async fn start_bot(
                 Ok(Data {
                     dc_event_tx,
                     mc_status_client,
-                    target_channel_id_list: bridge_channel_list.clone(),
+                    bridge_channel: bridge_channel.clone(),
+                    storage: storage.clone(),
                     rcon_client,
                     mc_server_address: addr,
                 })
@@ -101,42 +106,44 @@ pub async fn start_bot(
         while let Some(event) = mc_event_rx.recv().await {
             let formatted_message = format!("**{}**: {}", event.username, event.content);
 
-            let targets = {
-                let guard = bridge_channel_list_clone.read().await;
-                guard.clone()
+            let target_channel = {
+                let guard = bridge_channel_clone.read().await;
+                *guard
             };
 
-            if targets.is_empty() {
+            let Some(target_channel) = target_channel else {
                 continue;
-            }
+            };
 
-            for target_channel in targets {
-                let http_clone = Arc::clone(&cache_http);
-                let msg = formatted_message.clone();
-                let remove_list = Arc::clone(&bridge_channel_list_clone);
+            let http_clone = Arc::clone(&cache_http);
+            let msg = formatted_message.clone();
+            let bridge_ref = Arc::clone(&bridge_channel_clone);
+            let storage_ref = Arc::clone(&storage_for_forward);
 
-                tokio::spawn(async move {
-                    if let Err(why) = target_channel.say(http_clone, msg).await {
-                        tracing::warn!(
+            tokio::spawn(async move {
+                if let Err(why) = target_channel.say(http_clone, msg).await {
+                    tracing::warn!(
+                        channel = %target_channel,
+                        error = %why,
+                        "failed to forward Minecraft event to Discord"
+                    );
+
+                    let error_msg = why.to_string();
+                    if error_msg.contains("Unknown Channel")
+                        || error_msg.contains("Missing Access")
+                    {
+                        let mut guard = bridge_ref.write().await;
+                        *guard = None;
+                        tracing::info!(
                             channel = %target_channel,
-                            error = %why,
-                            "failed to forward Minecraft event to Discord"
+                            "cleared unreachable bridge channel"
                         );
-
-                        let error_msg = why.to_string();
-                        if error_msg.contains("Unknown Channel")
-                            || error_msg.contains("Missing Access")
-                        {
-                            let mut guard = remove_list.write().await;
-                            guard.retain(|c| *c != target_channel);
-                            tracing::info!(
-                                channel = %target_channel,
-                                "removed unreachable channel from bridge list"
-                            );
+                        if let Err(e) = storage_ref.clear_bridge_channel().await {
+                            tracing::error!(%e, "failed to persist bridge clear");
                         }
                     }
-                });
-            }
+                }
+            });
         }
     });
 
@@ -200,8 +207,8 @@ async fn event_handler(
         }
         serenity::FullEvent::Message { new_message } => {
             let should_relay = {
-                let targets = data.target_channel_id_list.read().await;
-                targets.contains(&new_message.channel_id)
+                let guard = data.bridge_channel.read().await;
+                *guard == Some(new_message.channel_id)
             };
 
             if should_relay && new_message.author.id != ctx.cache.current_user().id {

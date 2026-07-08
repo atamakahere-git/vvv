@@ -6,6 +6,7 @@ use rust_mc_status::McClient;
 use tokio::sync::{Mutex, RwLock, mpsc::Sender};
 
 use crate::log_parser::MinecraftEvent;
+use crate::storage::Storage;
 
 #[derive(Debug, Clone)]
 pub struct FromMinecraftEvent {
@@ -30,7 +31,8 @@ pub struct BotParams {
 pub struct Data {
     pub dc_event_tx: Sender<FromDiscordEvent>,
     pub mc_status_client: McClient,
-    pub target_channel_id_list: Arc<RwLock<Vec<serenity::ChannelId>>>,
+    pub bridge_channel: Arc<RwLock<Option<serenity::ChannelId>>>,
+    pub storage: Arc<Storage>,
     pub rcon_client: Arc<Mutex<RconClient>>,
     pub mc_server_address: url::Url,
 }

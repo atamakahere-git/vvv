@@ -18,6 +18,8 @@ pub enum BotError {
     Config(#[from] crate::consts::ConfigError),
     #[error("rcon error: {0}")]
     Rcon(#[from] crate::rcon::RconError),
+    #[error("storage error: {0}")]
+    Storage(#[from] crate::storage::StorageError),
 }
 
 impl From<poise::serenity_prelude::Error> for BotError {

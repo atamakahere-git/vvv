@@ -168,19 +168,19 @@ pub async fn info(ctx: Context<'_>) -> Result<(), BotError> {
 )]
 pub async fn start_bridge(ctx: Context<'_>) -> Result<(), BotError> {
     let current_channel_id = ctx.channel_id();
+    let guild_id = ctx.guild_id().map(|g| g.get()).unwrap_or(0);
 
-    let channels_to_save = {
-        let shared_list = &ctx.data().target_channel_id_list;
-        let mut lock = shared_list.write().await;
-        if !lock.contains(&current_channel_id) {
-            lock.push(current_channel_id);
-        }
-        lock.iter().map(|c| c.get()).collect::<Vec<_>>()
-    };
+    {
+        let bridge = &ctx.data().bridge_channel;
+        let mut lock = bridge.write().await;
+        *lock = Some(current_channel_id);
+    }
 
-    crate::storage::save_channels(channels_to_save)
+    ctx.data()
+        .storage
+        .set_bridge_channel(current_channel_id.get(), guild_id)
         .await
-        .inspect_err(|e| tracing::error!(%e, "failed to persist bridge state"))
+        .inspect_err(|e| tracing::error!(%e, "failed to persist bridge binding"))
         .ok();
 
     tracing::info!(
@@ -200,22 +200,23 @@ pub async fn start_bridge(ctx: Context<'_>) -> Result<(), BotError> {
 #[poise::command(slash_command, prefix_command, check = "is_owner_or_admin")]
 pub async fn stop_bridge(ctx: Context<'_>) -> Result<(), BotError> {
     let current_channel_id = ctx.channel_id();
-    let shared_list = &ctx.data().target_channel_id_list;
+    let bridge = &ctx.data().bridge_channel;
 
-    let (was_bridged, channels_to_save) = {
-        let mut lock = shared_list.write().await;
-        let len_before = lock.len();
-        lock.retain(|&id| id != current_channel_id);
-        (
-            lock.len() < len_before,
-            lock.iter().map(|c| c.get()).collect::<Vec<_>>(),
-        )
+    let was_bridged = {
+        let mut lock = bridge.write().await;
+        let is_current = *lock == Some(current_channel_id);
+        if is_current {
+            *lock = None;
+        }
+        is_current
     };
 
     if was_bridged {
-        crate::storage::save_channels(channels_to_save)
+        ctx.data()
+            .storage
+            .clear_bridge_channel()
             .await
-            .inspect_err(|e| tracing::error!(%e, "failed to persist bridge state"))
+            .inspect_err(|e| tracing::error!(%e, "failed to persist bridge clear"))
             .ok();
         tracing::info!(
             user = %ctx.author().name,
