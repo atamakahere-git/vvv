@@ -259,7 +259,7 @@ impl StatsTracker {
             match tokio::time::timeout(Duration::from_secs(5), rcon.send_command(msg)).await {
                 Ok(Ok(_)) => tracing::info!(username = %user, "login reminder sent"),
                 Ok(Err(e)) => {
-                    tracing::warn!(%e, username = %user, "failed to send login reminder via rcon")
+                    tracing::warn!(%e, username = %user, "failed to send login reminder via rcon");
                 }
                 Err(_) => tracing::warn!(username = %user, "rcon login reminder timed out"),
             }
@@ -277,7 +277,7 @@ impl StatsTracker {
             match tokio::time::timeout(Duration::from_secs(5), rcon.send_command(msg)).await {
                 Ok(Ok(_)) => tracing::info!(username = %user, "new player welcome sent"),
                 Ok(Err(e)) => {
-                    tracing::warn!(%e, username = %user, "failed to send new player welcome via rcon")
+                    tracing::warn!(%e, username = %user, "failed to send new player welcome via rcon");
                 }
                 Err(_) => tracing::warn!(username = %user, "rcon welcome timed out"),
             }
