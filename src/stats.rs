@@ -249,16 +249,25 @@ impl StatsTracker {
             .await
             .unwrap_or(0);
 
-        let yesterday_str = format_duration(yesterday_secs);
+let yesterday_str = format_duration(yesterday_secs);
         let msg = format!(
             r#"tellraw @a {{"text":"[Stats] Welcome back {username}! Last login: {last_login_str}. Yesterday you played {yesterday_str}.","color":"gold"}}"#
         );
 
-        if let Err(e) = self.rcon.send_command(&msg) {
-            tracing::warn!(%e, %username, "failed to send login reminder via rcon");
-        } else {
-            tracing::info!(%username, last_login = %last_login_str, yesterday = %yesterday_str, "login reminder sent");
-        }
+        let rcon = Arc::clone(&self.rcon);
+        let user = username.to_string();
+        tokio::spawn(async move {
+            match tokio::time::timeout(
+                Duration::from_secs(5),
+                rcon.send_command(msg),
+            )
+            .await
+            {
+                Ok(Ok(_)) => tracing::info!(username = %user, "login reminder sent"),
+                Ok(Err(e)) => tracing::warn!(%e, username = %user, "failed to send login reminder via rcon"),
+                Err(_) => tracing::warn!(username = %user, "rcon login reminder timed out"),
+            }
+        });
     }
 
     async fn send_new_player_welcome(&self, username: &str) {
@@ -266,11 +275,20 @@ impl StatsTracker {
             r#"tellraw @a {{"text":"[Stats] Welcome {username}! This is your first login.","color":"green"}}"#
         );
 
-        if let Err(e) = self.rcon.send_command(&msg) {
-            tracing::warn!(%e, %username, "failed to send new player welcome via rcon");
-        } else {
-            tracing::info!(%username, "new player welcome sent");
-        }
+        let rcon = Arc::clone(&self.rcon);
+        let user = username.to_string();
+        tokio::spawn(async move {
+            match tokio::time::timeout(
+                Duration::from_secs(5),
+                rcon.send_command(msg),
+            )
+            .await
+            {
+                Ok(Ok(_)) => tracing::info!(username = %user, "new player welcome sent"),
+                Ok(Err(e)) => tracing::warn!(%e, username = %user, "failed to send new player welcome via rcon"),
+                Err(_) => tracing::warn!(username = %user, "rcon welcome timed out"),
+            }
+        });
     }
 }
 

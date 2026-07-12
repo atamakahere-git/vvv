@@ -155,7 +155,7 @@ fn spawn_dc_to_mc_relay(
             let formatted_command = format!(
                 r#"tellraw @a {{"text":"[Discord] <{safe_username}>: {safe_content}", "color":"gold"}}"#
             );
-            if let Err(why) = rcon.send_command(&formatted_command) {
+            if let Err(why) = rcon.send_command(formatted_command).await {
                 tracing::warn!(
                     username = %event.username,
                     error = %why,

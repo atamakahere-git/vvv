@@ -1049,7 +1049,7 @@ checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 
 [[package]]
 name = "meow"
-version = "0.4.0"
+version = "0.5.3"
 dependencies = [
  "base64",
  "chrono",
@@ -1057,6 +1057,7 @@ dependencies = [
  "linemux",
  "mc-rcon",
  "poise",
+ "rand 0.9.4",
  "redb",
  "regex",
  "rust-mc-status",

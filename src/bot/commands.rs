@@ -78,7 +78,7 @@ pub async fn info(ctx: Context<'_>) -> Result<(), BotError> {
         "command /info executed"
     );
 
-    let rcon_response = match ctx.data().rcon_client.send_command("list") {
+    let rcon_response = match ctx.data().rcon_client.send_command("list".to_string()).await {
         Ok(res) => res,
         Err(e) => format!("Error executing RCON list: {e:?}"),
     };
