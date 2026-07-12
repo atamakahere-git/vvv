@@ -752,6 +752,14 @@ fn write_account_mapping(db: &Database, discord_id: u64, mc_username: &str) -> R
         let mut dc_table = wtxn.open_table(DC_TO_MC)?;
         let mut mc_table = wtxn.open_table(MC_TO_DC)?;
 
+        // TOCTOU guard: re-check inside the transaction that the MC username
+        // is not already claimed by a different Discord user.
+        if let Some(existing) = mc_table.get(mc_username.to_string())?
+            && existing.value() != discord_id
+        {
+            return Err(StorageError::AlreadyClaimed);
+        }
+
         let old_mc = dc_table.get(discord_id)?.map(|g| g.value());
         if let Some(ref old) = old_mc {
             mc_table.remove(old.clone())?;

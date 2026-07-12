@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::fmt::Write;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use base64::Engine;
@@ -473,16 +472,14 @@ pub async fn leaderboard(ctx: Context<'_>) -> Result<(), BotError> {
     Ok(())
 }
 
-static CODE_COUNTER: AtomicU64 = AtomicU64::new(0);
-
 fn generate_verification_code() -> String {
-    let count = CODE_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as u64;
-    let combined = timestamp.wrapping_mul(31).wrapping_add(count);
-    format!("{:08X}", combined & 0xFFFF_FFFF)
+    let value: u64 = rand::random();
+    format!("{:016X}", value)
+}
+
+fn is_valid_mc_username(name: &str) -> bool {
+    (3..=16).contains(&name.len())
+        && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
 }
 
 fn connect_help() -> String {
@@ -511,6 +508,11 @@ pub async fn connect(
         return Ok(());
     }
 
+    if !is_valid_mc_username(&mc_username) {
+        ctx.say("❌ Invalid Minecraft username. Must be 3–16 characters, using only letters, numbers, and underscores.").await?;
+        return Ok(());
+    }
+
     if ctx.data().storage.is_connected_dc(discord_id).await {
         ctx.say("❌ You are already connected to a Minecraft account. Use `/disconnect` first if you want to switch.".to_string())
             .await?;
@@ -529,6 +531,14 @@ pub async fn connect(
         return Ok(());
     }
 
+    {
+        let guard = ctx.data().pending_verifications.lock().await;
+        if guard.values().any(|v| v.discord_user_id == discord_id) {
+            ctx.say("❌ You already have a pending verification. Wait for it to expire (30s) or complete it first.").await?;
+            return Ok(());
+        }
+    }
+
     let code = generate_verification_code();
 
     {
@@ -538,8 +548,8 @@ pub async fn connect(
             PendingVerification {
                 discord_user_id: discord_id,
                 mc_username: mc_username.clone(),
-                code: code.clone(),
                 expires_at: Instant::now() + std::time::Duration::from_secs(30),
+                attempts: 0,
             },
         );
     }

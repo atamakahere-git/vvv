@@ -227,21 +227,18 @@ pub async fn start_bot(
                 continue;
             };
 
-            if let Some(code) = event.content.strip_prefix("@s CONFIRM-")
-                .or_else(|| event.content.strip_prefix("@S CONFIRM-"))
-                .or_else(|| event.content.strip_prefix("@s confirm-"))
-                .or_else(|| event.content.strip_prefix("@S confirm-"))
-            {
-                let code = code.trim().to_string();
+            let lower = event.content.to_ascii_lowercase();
+            if let Some(code_raw) = lower.strip_prefix("@s confirm-") {
+                let code = code_raw.trim().to_ascii_uppercase();
                 let mut guard = pv_for_forward.lock().await;
-                let maybe_pending = guard.remove(&code);
-                drop(guard);
 
-                if let Some(pending) = maybe_pending {
+                if let Some(pending) = guard.remove(&code) {
                     if pending.mc_username != event.username {
+                        guard.insert(code, pending);
                         continue;
                     }
                     if pending.expires_at <= Instant::now() {
+                        drop(guard);
                         let http = Arc::clone(&cache_http_for_forward);
                         let _ = target_channel
                             .say(
@@ -254,6 +251,7 @@ pub async fn start_bot(
                             .await;
                         continue;
                     }
+                    drop(guard);
                     let http = Arc::clone(&cache_http_for_forward);
                     let storage = Arc::clone(&storage_for_forward);
                     let mc = pending.mc_username.clone();
@@ -278,6 +276,36 @@ pub async fn start_bot(
                                 .await;
                         }
                     });
+                    continue;
+                }
+
+                let mut lockout_key: Option<String> = None;
+                for (key, pending) in guard.iter_mut() {
+                    if pending.mc_username == event.username {
+                        pending.attempts += 1;
+                        if pending.attempts >= 3 {
+                            lockout_key = Some(key.clone());
+                        }
+                        break;
+                    }
+                }
+                if let Some(key) = &lockout_key {
+                    let pending = guard.remove(key);
+                    drop(guard);
+                    if let Some(pending) = pending {
+                        let http = Arc::clone(&cache_http_for_forward);
+                        let _ = target_channel
+                            .say(
+                                http,
+                                format!(
+                                    "🚫 <@{}> Verification for `{}` locked out after 3 failed attempts. Use `/connect` again.",
+                                    pending.discord_user_id, pending.mc_username
+                                ),
+                            )
+                            .await;
+                    }
+                } else {
+                    drop(guard);
                 }
                 continue;
             }

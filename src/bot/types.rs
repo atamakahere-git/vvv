@@ -27,8 +27,8 @@ pub struct FromDiscordEvent {
 pub struct PendingVerification {
     pub discord_user_id: u64,
     pub mc_username: String,
-    pub code: String,
     pub expires_at: Instant,
+    pub attempts: u32,
 }
 
 /// Bot configuration fields that are consumed once during startup.
