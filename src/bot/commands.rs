@@ -460,7 +460,8 @@ pub async fn alerts_join(ctx: Context<'_>) -> Result<(), BotError> {
     }
 
     if !ctx.data().storage.is_connected_dc(discord_id).await {
-        ctx.say("❌ You must `/connect` your Minecraft account first.").await?;
+        ctx.say("❌ You must `/connect` your Minecraft account first.")
+            .await?;
         return Ok(());
     }
 
@@ -472,9 +473,11 @@ pub async fn alerts_join(ctx: Context<'_>) -> Result<(), BotError> {
         .await?;
 
     if new_state {
-        ctx.say("🔇 Your Minecraft activity will no longer be broadcast in the bridge.").await?;
+        ctx.say("🔇 Your Minecraft activity will no longer be broadcast in the bridge.")
+            .await?;
     } else {
-        ctx.say("🔊 Your Minecraft activity will now be broadcast in the bridge.").await?;
+        ctx.say("🔊 Your Minecraft activity will now be broadcast in the bridge.")
+            .await?;
     }
     Ok(())
 }
@@ -498,7 +501,8 @@ pub async fn alerts_mentions(ctx: Context<'_>) -> Result<(), BotError> {
     }
 
     if !ctx.data().storage.is_connected_dc(discord_id).await {
-        ctx.say("❌ You must `/connect` your Minecraft account first.").await?;
+        ctx.say("❌ You must `/connect` your Minecraft account first.")
+            .await?;
         return Ok(());
     }
 
@@ -510,9 +514,11 @@ pub async fn alerts_mentions(ctx: Context<'_>) -> Result<(), BotError> {
         .await?;
 
     if new_state {
-        ctx.say("🔕 You will not be pinged when your Minecraft name is mentioned.").await?;
+        ctx.say("🔕 You will not be pinged when your Minecraft name is mentioned.")
+            .await?;
     } else {
-        ctx.say("🔔 You will be pinged when your Minecraft name is mentioned.").await?;
+        ctx.say("🔔 You will be pinged when your Minecraft name is mentioned.")
+            .await?;
     }
     Ok(())
 }
@@ -793,7 +799,8 @@ pub async fn profile(
     );
 
     if !ctx.data().storage.is_player_profile_enabled().await {
-        ctx.say("🚫 **Profile dashboard is disabled by the bot owner.**").await?;
+        ctx.say("🚫 **Profile dashboard is disabled by the bot owner.**")
+            .await?;
         return Ok(());
     }
 
@@ -839,11 +846,7 @@ pub async fn profile(
         .ok();
 
     let storage = &ctx.data().storage;
-    let redb_stats = storage
-        .get_player_stats(uuid.clone())
-        .await
-        .ok()
-        .flatten();
+    let redb_stats = storage.get_player_stats(uuid.clone()).await.ok().flatten();
 
     let now = chrono::Local::now();
     let dates: Vec<String> = (0..7)
@@ -889,19 +892,13 @@ pub async fn profile_toggle(
 
     match action.to_lowercase().as_str() {
         "enable" | "on" => {
-            ctx.data()
-                .storage
-                .set_player_profile_enabled(true)
-                .await?;
+            ctx.data().storage.set_player_profile_enabled(true).await?;
             tracing::info!(user = %ctx.author().name, "profile dashboard enabled");
             ctx.say("📊 **Player profile dashboard enabled.**\n\nPlayers can now use `/profile` to view detailed stats and advancements.")
                 .await?;
         }
         "disable" | "off" => {
-            ctx.data()
-                .storage
-                .set_player_profile_enabled(false)
-                .await?;
+            ctx.data().storage.set_player_profile_enabled(false).await?;
             tracing::info!(user = %ctx.author().name, "profile dashboard disabled");
             ctx.say("🚫 **Player profile dashboard disabled.**\n\nThe `/profile` command is now unavailable to all users.")
                 .await?;

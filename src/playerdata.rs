@@ -550,11 +550,7 @@ fn build_overview_embed(
                 rs.total_logins, rs.total_messages, rs.total_commands
             );
             if rs.first_login_ts > 0 {
-                let _ = writeln!(
-                    overview,
-                    "🕐 First seen: <t:{}:R>",
-                    rs.first_login_ts
-                );
+                let _ = writeln!(overview, "🕐 First seen: <t:{}:R>", rs.first_login_ts);
             }
             if rs.last_login_ts > 0 {
                 let _ = writeln!(overview, "🟢 Last login: <t:{}:R>", rs.last_login_ts);
@@ -666,11 +662,7 @@ fn build_stats_embed(
     if !daily_play_time.is_empty() {
         let week_total: u64 = daily_play_time.iter().map(|(_, s)| *s).sum();
         let _ = writeln!(desc);
-        let _ = writeln!(
-            desc,
-            "📅 **This Week:** {}",
-            format_play_time(week_total)
-        );
+        let _ = writeln!(desc, "📅 **This Week:** {}", format_play_time(week_total));
         let _ = writeln!(desc, "```");
         for (date, secs) in daily_play_time {
             let bar = daily_bar(*secs);

@@ -497,10 +497,7 @@ impl Storage {
     /// # Errors
     ///
     /// Returns `StorageError` on persistence failure.
-    pub async fn set_player_profile_enabled(
-        &self,
-        enabled: bool,
-    ) -> Result<(), StorageError> {
+    pub async fn set_player_profile_enabled(&self, enabled: bool) -> Result<(), StorageError> {
         let db = Arc::clone(&self.db);
         tokio::task::spawn_blocking(move || write_player_profile_setting(&db, enabled))
             .await
