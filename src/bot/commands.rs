@@ -1071,6 +1071,56 @@ pub async fn profile(
     Ok(())
 }
 
+fn profile_toggle_help() -> String {
+    String::from("Enable or disable the player profile dashboard feature.")
+}
+
+/// Toggle the player profile dashboard on or off.
+///
+/// Bot owner only.  When disabled, /profile returns a "disabled by admin" message.
+#[poise::command(slash_command, prefix_command, help_text_fn = profile_toggle_help, check = "is_owner")]
+pub async fn profile_toggle(
+    ctx: Context<'_>,
+    #[description = "enable, disable, or status"] action: Option<String>,
+) -> Result<(), BotError> {
+    let action = action.as_deref().unwrap_or("status");
+
+    match action.to_lowercase().as_str() {
+        "enable" | "on" => {
+            ctx.data()
+                .storage
+                .set_player_profile_enabled(true)
+                .await?;
+            tracing::info!(user = %ctx.author().name, "profile dashboard enabled");
+            ctx.say("📊 **Player profile dashboard enabled.**\n\nPlayers can now use `/profile` to view detailed stats and advancements.")
+                .await?;
+        }
+        "disable" | "off" => {
+            ctx.data()
+                .storage
+                .set_player_profile_enabled(false)
+                .await?;
+            tracing::info!(user = %ctx.author().name, "profile dashboard disabled");
+            ctx.say("🚫 **Player profile dashboard disabled.**\n\nThe `/profile` command is now unavailable to all users.")
+                .await?;
+        }
+        _ => {
+            let enabled = ctx.data().storage.is_player_profile_enabled().await;
+            let status = if enabled {
+                "📊 enabled"
+            } else {
+                "🚫 disabled"
+            };
+            ctx.say(format!(
+                "**Player profile dashboard** is currently **{status}**.\n\nUse `/profile_toggle enable` or `/profile_toggle disable` to toggle."
+            ))
+            .await?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Show all available commands or get detailed help for a specific one.
 #[poise::command(slash_command, prefix_command)]
 pub async fn help(ctx: Context<'_>, command_name: Option<String>) -> Result<(), BotError> {

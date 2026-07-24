@@ -217,6 +217,7 @@ pub async fn start_bot(
                 commands::mute(),
                 commands::unmute(),
                 commands::privacy(),
+                commands::profile_toggle(),
                 commands::profile(),
                 commands::help(),
             ],

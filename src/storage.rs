@@ -49,6 +49,7 @@ const MUTED_USERS: TableDefinition<u64, u64> = TableDefinition::new("muted_users
 /// Key-value settings table (e.g. `privacy_enabled`).
 const SETTINGS: TableDefinition<&str, bool> = TableDefinition::new("settings");
 const PRIVACY_ENABLED_KEY: &str = "privacy_enabled";
+const PLAYER_PROFILE_ENABLED_KEY: &str = "player_profile_enabled";
 
 /// (UUID, "YYYY-MM-DD") → seconds played that day (in configured timezone).
 pub const DAILY_PLAY_TIME: TableDefinition<(String, String), u64> =
@@ -170,6 +171,8 @@ pub struct Storage {
     muted_users: Arc<RwLock<HashMap<u64, u64>>>,
     /// Global privacy feature toggle (admin-controlled).
     privacy_enabled: Arc<RwLock<bool>>,
+    /// Player profile dashboard toggle (admin-controlled).
+    player_profile_enabled: Arc<RwLock<bool>>,
 }
 
 impl Storage {
@@ -196,6 +199,7 @@ impl Storage {
         let mute = load_optout_set(&db, MUTE_MENTION);
         let muted = load_muted_users(&db);
         let privacy = load_privacy_enabled(&db);
+        let profile_toggle = load_player_profile_enabled(&db);
 
         Ok(Self {
             db: Arc::new(db),
@@ -205,6 +209,7 @@ impl Storage {
             mute_mention: Arc::new(RwLock::new(mute)),
             muted_users: Arc::new(RwLock::new(muted)),
             privacy_enabled: Arc::new(RwLock::new(privacy)),
+            player_profile_enabled: Arc::new(RwLock::new(profile_toggle)),
         })
     }
 
@@ -475,6 +480,33 @@ impl Storage {
             .map_err(|e| StorageError::BlockingPanic(e.to_string()))??;
 
         *self.privacy_enabled.write().await = enabled;
+        Ok(())
+    }
+
+    /// Check whether the player profile dashboard feature is enabled.
+    ///
+    /// In-memory only — read on every command invocation.
+    pub async fn is_player_profile_enabled(&self) -> bool {
+        *self.player_profile_enabled.read().await
+    }
+
+    /// Enable or disable the player profile dashboard globally.
+    ///
+    /// Writes to both in-memory and redb.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError` on persistence failure.
+    pub async fn set_player_profile_enabled(
+        &self,
+        enabled: bool,
+    ) -> Result<(), StorageError> {
+        let db = Arc::clone(&self.db);
+        tokio::task::spawn_blocking(move || write_player_profile_setting(&db, enabled))
+            .await
+            .map_err(|e| StorageError::BlockingPanic(e.to_string()))??;
+
+        *self.player_profile_enabled.write().await = enabled;
         Ok(())
     }
 
@@ -903,6 +935,31 @@ fn write_privacy_setting(db: &Database, enabled: bool) -> Result<(), StorageErro
     Ok(())
 }
 
+fn load_player_profile_enabled(db: &Database) -> bool {
+    let Ok(rtxn) = db.begin_read() else {
+        return true;
+    };
+
+    let Ok(table) = rtxn.open_table(SETTINGS) else {
+        return true;
+    };
+
+    match table.get(PLAYER_PROFILE_ENABLED_KEY) {
+        Ok(Some(g)) => g.value(),
+        _ => true,
+    }
+}
+
+fn write_player_profile_setting(db: &Database, enabled: bool) -> Result<(), StorageError> {
+    let wtxn = db.begin_write()?;
+    {
+        let mut table = wtxn.open_table(SETTINGS)?;
+        table.insert(PLAYER_PROFILE_ENABLED_KEY, enabled)?;
+    }
+    wtxn.commit()?;
+    Ok(())
+}
+
 fn load_muted_users(db: &Database) -> HashMap<u64, u64> {
     let mut map = HashMap::new();
 
@@ -1154,6 +1211,7 @@ fn open_test_storage(path: &Path) -> Storage {
     let mute = load_optout_set(&db, MUTE_MENTION);
     let privacy = load_privacy_enabled(&db);
     let muted = load_muted_users(&db);
+    let profile_toggle = load_player_profile_enabled(&db);
 
     Storage {
         db: Arc::new(db),
@@ -1163,6 +1221,7 @@ fn open_test_storage(path: &Path) -> Storage {
         mute_mention: Arc::new(RwLock::new(mute)),
         muted_users: Arc::new(RwLock::new(muted)),
         privacy_enabled: Arc::new(RwLock::new(privacy)),
+        player_profile_enabled: Arc::new(RwLock::new(profile_toggle)),
     }
 }
 
@@ -1322,6 +1381,34 @@ mod tests {
             let storage = open_test_storage(&path);
             let result = storage.is_muted(42).await;
             assert_eq!(result, Some(0));
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[tokio::test]
+    async fn profile_toggle_defaults_to_enabled() {
+        let path = temp_db_path("profile_toggle_default");
+        let _ = std::fs::remove_file(&path);
+        let storage = open_test_storage(&path);
+        assert!(storage.is_player_profile_enabled().await);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[tokio::test]
+    async fn profile_toggle_set_and_persist() {
+        let path = temp_db_path("profile_toggle_persist");
+        let _ = std::fs::remove_file(&path);
+        {
+            let storage = open_test_storage(&path);
+            storage
+                .set_player_profile_enabled(false)
+                .await
+                .expect("set failed");
+            assert!(!storage.is_player_profile_enabled().await);
+        }
+        {
+            let storage = open_test_storage(&path);
+            assert!(!storage.is_player_profile_enabled().await);
         }
         let _ = std::fs::remove_file(&path);
     }
