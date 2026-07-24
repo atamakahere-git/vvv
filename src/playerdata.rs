@@ -606,11 +606,21 @@ fn build_stats_embed(
 ) -> poise::serenity_prelude::CreateEmbed {
     let file_stats = profile.stats.as_ref();
 
+    let week_total: u64 = daily_play_time.iter().map(|(_, s)| *s).sum();
+
     let mut desc = String::new();
 
     if let Some(rs) = redb_stats {
         let playtime = format_play_time(rs.total_play_time_secs);
-        let _ = writeln!(desc, "⏱️ **Play Time:** {playtime}");
+        if week_total > 0 {
+            let _ = writeln!(
+                desc,
+                "⏱️ **Total:** {playtime}  •  📅 **Last Week:** {}",
+                format_play_time(week_total)
+            );
+        } else {
+            let _ = writeln!(desc, "⏱️ **Total:** {playtime}");
+        }
         let _ = writeln!(
             desc,
             "💀 **Deaths:** {}  •  ⚔️ **Mob Kills:** {}  •  🔑 **Logins:** {}",
@@ -625,7 +635,15 @@ fn build_stats_embed(
         );
     } else if let Some(stats) = file_stats {
         let playtime = format_play_time(stats.play_time_secs);
-        let _ = writeln!(desc, "⏱️ **Play Time:** {playtime}");
+        if week_total > 0 {
+            let _ = writeln!(
+                desc,
+                "⏱️ **Total:** {playtime}  •  📅 **Last Week:** {}",
+                format_play_time(week_total)
+            );
+        } else {
+            let _ = writeln!(desc, "⏱️ **Total:** {playtime}");
+        }
         let _ = writeln!(
             desc,
             "💀 **Deaths:** {}  •  ⚔️ **Mob Kills:** {}",
@@ -660,9 +678,8 @@ fn build_stats_embed(
     }
 
     if !daily_play_time.is_empty() {
-        let week_total: u64 = daily_play_time.iter().map(|(_, s)| *s).sum();
         let _ = writeln!(desc);
-        let _ = writeln!(desc, "📅 **This Week:** {}", format_play_time(week_total));
+        let _ = writeln!(desc, "📅 **Daily Breakdown:**");
         let _ = writeln!(desc, "```");
         for (date, secs) in daily_play_time {
             let bar = daily_bar(*secs);
