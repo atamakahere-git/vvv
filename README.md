@@ -17,6 +17,7 @@ Unlike traditional bridges, VVV uses direct log-tailing to read Minecraft server
 - **Persistent Bridge State** — Channel bindings survive bot restarts. Stored in an embedded `redb` database.
 - **Player Info** — `/info` queries the server via both RCON and Server List Ping, displaying online players, MOTD, latency, and the server icon.
 - **Account Linking** — `/connect` links Discord ↔ Minecraft accounts via in-game verification codes.
+- **Player Profile Dashboard** — `/profile` shows a multi-page dashboard with NBT player data (health, position, inventory), cumulative and daily stats from redb, and advancement progress — all in one command.
 - **Player Stats** — Play time, deaths, advancements, messages, commands tracked per player with daily breakdowns.
 - **Mention Cross-Translation** — `@DiscordUser` in MC → Discord ping; `@MCPlayer` in Discord → `@playername` in MC.
 - **Privacy Controls** — `/unsub`/`/sub` for join/leave announcements, `/mutemention`/`/unmutemention` for mention muting.
@@ -72,6 +73,9 @@ password = "your_secure_rcon_password_here"
 [minecraft]
 # Minecraft server address and port for status pings (default: "localhost:25565")
 server_address = "localhost:25565"
+# Optional: Path to the Minecraft world directory for player profile data.
+# Enables the ~profile command. Must contain playerdata/, stats/, advancements/ subdirectories.
+# world_directory = "/var/minecraft/world"
 
 [bot]
 # Discord user ID of the bot owner
@@ -109,6 +113,7 @@ Each TOML field has a corresponding `VVV_*` environment variable. Use these for 
 | `VVV_GUILD_ID` | `bot.guild_id` | No | — (instant slash cmd sync) |
 | `VVV_DATABASE_PATH` | `storage.database_path` | No | `$XDG_STATE_HOME/vvv/vvv.redb` |
 | `VVV_STATS_TIMEZONE` | `stats.timezone` | No | `UTC` |
+| `VVV_MC_WORLD_DIRECTORY` | `minecraft.world_directory` | No | — (disables `/profile` if unset) |
 
 ### Discord Setup
 
@@ -230,8 +235,7 @@ All commands support both `~` prefix (`~ping`) and Slash Commands (`/ping`).
 | `~info` | Query the server for online players, MOTD, latency, and server icon |
 | `~connect <mc_username>` | Link your Discord account to a Minecraft username (in-game verification) |
 | `~disconnect` | Unlink your Discord account from Minecraft |
-| `~stats [player]` | Show cumulative stats for a player (play time, deaths, etc.) |
-| `~playtime [player]` | Show daily play time breakdown for the last 7 days |
+| `~profile [player]` | View player dashboard with stats, advancements, daily playtime, and inventory |
 | `~leaderboard` | Show the top 10 players by total play time |
 | `~sub` | Opt in to join/leave announcements |
 | `~unsub` | Opt out of join/leave announcements |
@@ -247,6 +251,7 @@ All commands support both `~` prefix (`~ping`) and Slash Commands (`/ping`).
 | `~mute <user> [duration]` | Mute a user from sending Discord→MC bridge messages (default 5m) |
 | `~unmute <user>` | Unmute a previously muted user |
 | `~privacy [enable|disable]` | Toggle global privacy features |
+| `~profile_toggle [enable|disable]` | Toggle the player profile dashboard on or off |
 
 ### Owner Only
 
@@ -339,6 +344,7 @@ src/
   main.rs          — Entry point: channel setup, task spawning, glue
   consts.rs        — Configuration loading (TOML + env vars, XDG paths)
   log_parser.rs    — Minecraft log line → structured event parsing
+  playerdata.rs    — NBT player data parser, stats/advancements JSON, profile embeds
   rcon.rs          — RCON client with auto-reconnect
   stats.rs         — Player stats tracker (write-coalescing)
   storage.rs       — redb persistence layer (bridge state, accounts, stats)
