@@ -199,28 +199,31 @@ pub async fn start_bot(
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             event_handler: |ctx, event, _, data| Box::pin(event_handler(ctx, event, data)),
-            commands: vec![
-                commands::ping(),
-                commands::start_bridge(),
-                commands::stop_bridge(),
-                commands::info(),
-                commands::stats(),
-                commands::playtime(),
-                commands::leaderboard(),
-                commands::connect(),
-                commands::connect_admin(),
-                commands::disconnect(),
-                commands::unsub(),
-                commands::sub(),
-                commands::mutemention(),
-                commands::unmutemention(),
-                commands::mute(),
-                commands::unmute(),
-                commands::privacy(),
-                commands::profile_toggle(),
-                commands::profile(),
-                commands::help(),
-            ],
+            commands: {
+                let mut cmds = vec![
+                    commands::ping(),
+                    commands::start_bridge(),
+                    commands::stop_bridge(),
+                    commands::info(),
+                    commands::leaderboard(),
+                    commands::connect(),
+                    commands::connect_admin(),
+                    commands::disconnect(),
+                    commands::unsub(),
+                    commands::sub(),
+                    commands::mutemention(),
+                    commands::unmutemention(),
+                    commands::mute(),
+                    commands::unmute(),
+                    commands::privacy(),
+                ];
+                if world_directory.is_some() {
+                    cmds.push(commands::profile_toggle());
+                    cmds.push(commands::profile());
+                }
+                cmds.push(commands::help());
+                cmds
+            },
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("~".into()),
                 edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(

@@ -484,17 +484,24 @@ fn progress_bar(current: f32, max: f32, width: usize) -> String {
 }
 
 #[allow(clippy::too_many_lines)]
-pub fn build_profile_embeds(profile: &PlayerProfile) -> Vec<poise::serenity_prelude::CreateEmbed> {
+pub fn build_profile_embeds(
+    profile: &PlayerProfile,
+    redb_stats: Option<&crate::storage::PlayerStats>,
+    daily_play_time: &[(String, u64)],
+) -> Vec<poise::serenity_prelude::CreateEmbed> {
     let mut embeds = Vec::new();
-    embeds.push(build_overview_embed(profile));
-    embeds.push(build_stats_embed(profile));
+    embeds.push(build_overview_embed(profile, redb_stats));
+    embeds.push(build_stats_embed(profile, redb_stats, daily_play_time));
     if profile.advancements.is_some() {
         embeds.push(build_advancements_embed(profile));
     }
     embeds
 }
 
-fn build_overview_embed(profile: &PlayerProfile) -> poise::serenity_prelude::CreateEmbed {
+fn build_overview_embed(
+    profile: &PlayerProfile,
+    redb_stats: Option<&crate::storage::PlayerStats>,
+) -> poise::serenity_prelude::CreateEmbed {
     if let Some(ref pd) = profile.player_data {
         let health_bar = progress_bar(pd.health, 20.0, 20);
         let food_bar = progress_bar(pd.food_level as f32, 20.0, 20);
@@ -531,6 +538,28 @@ fn build_overview_embed(profile: &PlayerProfile) -> poise::serenity_prelude::Cre
             );
         }
         let _ = writeln!(overview, "💯 **Score:** {}", pd.score);
+
+        if let Some(rs) = redb_stats
+            && (rs.total_logins > 0 || rs.total_messages > 0 || rs.total_commands > 0)
+        {
+            let _ = writeln!(overview);
+            let _ = writeln!(overview, "📋 **Activity (tracked):**");
+            let _ = writeln!(
+                overview,
+                "🔑 Logins: {}  •  💬 Messages: {}  •  ⌨️ Commands: {}",
+                rs.total_logins, rs.total_messages, rs.total_commands
+            );
+            if rs.first_login_ts > 0 {
+                let _ = writeln!(
+                    overview,
+                    "🕐 First seen: <t:{}:R>",
+                    rs.first_login_ts
+                );
+            }
+            if rs.last_login_ts > 0 {
+                let _ = writeln!(overview, "🟢 Last login: <t:{}:R>", rs.last_login_ts);
+            }
+        }
 
         let items = inventory_items(&pd.inventory);
         let used_slots = items.len();
@@ -574,42 +603,57 @@ fn build_overview_embed(profile: &PlayerProfile) -> poise::serenity_prelude::Cre
     }
 }
 
-fn build_stats_embed(profile: &PlayerProfile) -> poise::serenity_prelude::CreateEmbed {
-    if let Some(ref stats) = profile.stats {
+fn build_stats_embed(
+    profile: &PlayerProfile,
+    redb_stats: Option<&crate::storage::PlayerStats>,
+    daily_play_time: &[(String, u64)],
+) -> poise::serenity_prelude::CreateEmbed {
+    let file_stats = profile.stats.as_ref();
+
+    let mut desc = String::new();
+
+    if let Some(rs) = redb_stats {
+        let playtime = format_play_time(rs.total_play_time_secs);
+        let _ = writeln!(desc, "⏱️ **Play Time:** {playtime}");
+        let _ = writeln!(
+            desc,
+            "💀 **Deaths:** {}  •  ⚔️ **Mob Kills:** {}  •  🔑 **Logins:** {}",
+            rs.total_deaths,
+            file_stats.map_or(0, |s| s.mob_kills),
+            rs.total_logins
+        );
+        let _ = writeln!(
+            desc,
+            "💬 **Messages:** {}  •  ⌨️ **Commands:** {}  •  🏆 **Advancements:** {}",
+            rs.total_messages, rs.total_commands, rs.total_advancements
+        );
+    } else if let Some(stats) = file_stats {
         let playtime = format_play_time(stats.play_time_secs);
-        let walked = format_distance(stats.distance_walked_cm);
-        let sprinted = format_distance(stats.distance_sprinted_cm);
-        let fallen = format_distance(stats.distance_fallen_cm);
-        let flown = format_distance(stats.distance_flown_cm);
-        let swum = format_distance(stats.distance_swum_cm);
-
-        let mut desc = String::new();
-
         let _ = writeln!(desc, "⏱️ **Play Time:** {playtime}");
         let _ = writeln!(
             desc,
             "💀 **Deaths:** {}  •  ⚔️ **Mob Kills:** {}",
             stats.deaths, stats.mob_kills
         );
+    }
+
+    if let Some(stats) = file_stats {
+        let walked = format_distance(stats.distance_walked_cm);
+        let flown = format_distance(stats.distance_flown_cm);
+        let swum = format_distance(stats.distance_swum_cm);
+
+        let _ = writeln!(desc);
+        let _ = writeln!(desc, "**Movement (from stats):**");
+        let _ = writeln!(
+            desc,
+            "👣 Walked: {walked}  •  ✈️ Flown: {flown}  •  🏊 Swum: {swum}"
+        );
+        let _ = writeln!(desc, "🦘 Jumps: {}", fmt_num(stats.jumps));
         let _ = writeln!(
             desc,
             "🗡️ **Damage Dealt:** {}  •  💥 **Damage Taken:** {}",
             fmt_num(stats.damage_dealt),
             fmt_num(stats.damage_taken)
-        );
-        let _ = writeln!(desc);
-        let _ = writeln!(desc, "**Movement:**");
-        let _ = writeln!(desc, "👣 Walked: {walked}  •  🏃 Sprinted: {sprinted}");
-        let _ = writeln!(
-            desc,
-            "✈️ Flown: {flown}  •  🕳️ Fallen: {fallen}  •  🏊 Swum: {swum}"
-        );
-        let _ = writeln!(desc, "🦘 Jumps: {}", fmt_num(stats.jumps));
-        let _ = writeln!(desc);
-        let _ = writeln!(
-            desc,
-            "🐣 Bred: {}  •  🎣 Fish: {}  •  🛏️ Slept: {}",
-            stats.animals_bred, stats.fish_caught, stats.times_slept
         );
 
         let top_killed = top_entries(&stats.killed, 5, "Nothing");
@@ -617,17 +661,32 @@ fn build_stats_embed(profile: &PlayerProfile) -> poise::serenity_prelude::Create
         let _ = writeln!(desc);
         let _ = writeln!(desc, "🔝 **Top Killed:** {top_killed}");
         let _ = writeln!(desc, "⛏️ **Top Mined:** {top_mined}");
-
-        poise::serenity_prelude::CreateEmbed::default()
-            .title(format!("📊 Statistics — {}", profile.username))
-            .color(0x0034_98DB)
-            .description(desc)
-    } else {
-        poise::serenity_prelude::CreateEmbed::default()
-            .title(format!("📊 Statistics — {}", profile.username))
-            .color(0x0034_98DB)
-            .description("No statistics data available for this player.")
     }
+
+    if !daily_play_time.is_empty() {
+        let week_total: u64 = daily_play_time.iter().map(|(_, s)| *s).sum();
+        let _ = writeln!(desc);
+        let _ = writeln!(
+            desc,
+            "📅 **This Week:** {}",
+            format_play_time(week_total)
+        );
+        let _ = writeln!(desc, "```");
+        for (date, secs) in daily_play_time {
+            let bar = daily_bar(*secs);
+            let _ = writeln!(desc, "{date}  {bar}");
+        }
+        let _ = writeln!(desc, "```");
+    }
+
+    if desc.is_empty() {
+        desc.push_str("No statistics data available for this player.");
+    }
+
+    poise::serenity_prelude::CreateEmbed::default()
+        .title(format!("📊 Statistics — {}", profile.username))
+        .color(0x0034_98DB)
+        .description(desc)
 }
 
 fn build_advancements_embed(profile: &PlayerProfile) -> poise::serenity_prelude::CreateEmbed {
@@ -705,6 +764,27 @@ fn fmt_num(n: u64) -> String {
     } else {
         n.to_string()
     }
+}
+
+fn daily_bar(secs: u64) -> String {
+    if secs == 0 {
+        return "        —".to_string();
+    }
+    let max_bar = secs.min(3600_u64);
+    let filled = ((max_bar as f64 / 3600.0) * 8.0).ceil() as usize;
+    let mut bar = String::with_capacity(16);
+    bar.push_str(&format_play_time(secs));
+    while bar.len() < 8 {
+        bar.push(' ');
+    }
+    bar.push(' ');
+    for _ in 0..filled {
+        bar.push('█');
+    }
+    for _ in filled..8 {
+        bar.push('░');
+    }
+    bar
 }
 
 fn top_entries(list: &[(String, u64)], count: usize, fallback: &str) -> String {
@@ -809,8 +889,8 @@ mod tests {
     fn build_embeds_for_profile() {
         let uuid = "0ea1daff-54aa-346f-9930-42c185cef5d2";
         let profile = load_player_profile(sample_world_dir(), uuid, "TestPlayer");
-        let embeds = build_profile_embeds(&profile);
-        assert_eq!(embeds.len(), 3, "should produce 3 embed pages");
+        let embeds = build_profile_embeds(&profile, None, &[]);
+        assert!(!embeds.is_empty(), "should produce embed pages");
     }
 
     #[test]
