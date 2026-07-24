@@ -441,20 +441,17 @@ pub async fn disconnect(ctx: Context<'_>) -> Result<(), BotError> {
     Ok(())
 }
 
-fn unsub_help() -> String {
-    String::from(
-        "Opt out — your Minecraft activity will not be broadcast, and your Discord messages will not reach Minecraft.",
-    )
+fn alerts_join_help() -> String {
+    String::from("Toggle join/leave announcements for your Minecraft activity.")
 }
 
-/// Stop bridging your Minecraft activity to Discord and your Discord messages to Minecraft.
+/// Toggle whether your Minecraft join/leave activity is broadcast in the bridge.
 ///
-/// You must `/connect` first.  This silences all MC→DC events (chat, join/leave,
-/// deaths, advancements, commands) and blocks your Discord messages from reaching MC.
-#[poise::command(slash_command, prefix_command, help_text_fn = unsub_help)]
-pub async fn unsub(ctx: Context<'_>) -> Result<(), BotError> {
+/// You must `/connect` first.  Shows current state after toggling.
+#[poise::command(slash_command, prefix_command, help_text_fn = alerts_join_help)]
+pub async fn alerts_join(ctx: Context<'_>) -> Result<(), BotError> {
     let discord_id = ctx.author().id.get();
-    tracing::info!(user = %ctx.author().name, discord_id = %discord_id, "command /unsub executed");
+    tracing::info!(user = %ctx.author().name, discord_id = %discord_id, "command /alerts join executed");
 
     if !ctx.data().storage.is_privacy_enabled().await {
         ctx.say("❌ Privacy features are currently disabled by the bot owner.")
@@ -463,32 +460,36 @@ pub async fn unsub(ctx: Context<'_>) -> Result<(), BotError> {
     }
 
     if !ctx.data().storage.is_connected_dc(discord_id).await {
-        ctx.say("❌ You must `/connect` your Minecraft account first.")
-            .await?;
+        ctx.say("❌ You must `/connect` your Minecraft account first.").await?;
         return Ok(());
     }
 
+    let currently_opted_out = ctx.data().storage.is_join_leave_opted_out(discord_id).await;
+    let new_state = !currently_opted_out;
     ctx.data()
         .storage
-        .set_join_leave_optout(discord_id, true)
+        .set_join_leave_optout(discord_id, new_state)
         .await?;
-    ctx.say("🔇 Your Minecraft activity will no longer be broadcast in the bridge, and your Discord messages will not be relayed to Minecraft.").await?;
+
+    if new_state {
+        ctx.say("🔇 Your Minecraft activity will no longer be broadcast in the bridge.").await?;
+    } else {
+        ctx.say("🔊 Your Minecraft activity will now be broadcast in the bridge.").await?;
+    }
     Ok(())
 }
 
-fn sub_help() -> String {
-    String::from(
-        "Re-enable bridging — your Minecraft activity and Discord messages will flow both ways again.",
-    )
+fn alerts_mentions_help() -> String {
+    String::from("Toggle cross-chat mention pings when your MC name is mentioned.")
 }
 
-/// Resume bridging your Minecraft activity to Discord and your Discord messages to Minecraft.
+/// Toggle whether you are pinged in Discord when your Minecraft name is mentioned.
 ///
-/// You must `/connect` first.
-#[poise::command(slash_command, prefix_command, help_text_fn = sub_help)]
-pub async fn sub(ctx: Context<'_>) -> Result<(), BotError> {
+/// You must `/connect` first.  Shows current state after toggling.
+#[poise::command(slash_command, prefix_command, help_text_fn = alerts_mentions_help)]
+pub async fn alerts_mentions(ctx: Context<'_>) -> Result<(), BotError> {
     let discord_id = ctx.author().id.get();
-    tracing::info!(user = %ctx.author().name, discord_id = %discord_id, "command /sub executed");
+    tracing::info!(user = %ctx.author().name, discord_id = %discord_id, "command /alerts mentions executed");
 
     if !ctx.data().storage.is_privacy_enabled().await {
         ctx.say("❌ Privacy features are currently disabled by the bot owner.")
@@ -497,84 +498,22 @@ pub async fn sub(ctx: Context<'_>) -> Result<(), BotError> {
     }
 
     if !ctx.data().storage.is_connected_dc(discord_id).await {
-        ctx.say("❌ You must `/connect` your Minecraft account first.")
-            .await?;
+        ctx.say("❌ You must `/connect` your Minecraft account first.").await?;
         return Ok(());
     }
 
+    let currently_muted = ctx.data().storage.is_mention_muted(discord_id).await;
+    let new_state = !currently_muted;
     ctx.data()
         .storage
-        .set_join_leave_optout(discord_id, false)
+        .set_mute_mention(discord_id, new_state)
         .await?;
-    ctx.say("🔊 Your Minecraft activity will now be broadcast in the bridge, and your Discord messages will be relayed to Minecraft.").await?;
-    Ok(())
-}
 
-fn mutemention_help() -> String {
-    String::from(
-        "Mute cross-chat mentions — you won't be pinged when your MC name is mentioned in chat.",
-    )
-}
-
-/// Mute cross-chat mention pings — you won't be pinged in Discord when your MC name is mentioned.
-///
-/// Requires `/connect` first.
-#[poise::command(slash_command, prefix_command, help_text_fn = mutemention_help)]
-pub async fn mutemention(ctx: Context<'_>) -> Result<(), BotError> {
-    let discord_id = ctx.author().id.get();
-    tracing::info!(user = %ctx.author().name, discord_id = %discord_id, "command /mutemention executed");
-
-    if !ctx.data().storage.is_privacy_enabled().await {
-        ctx.say("❌ Privacy features are currently disabled by the bot owner.")
-            .await?;
-        return Ok(());
+    if new_state {
+        ctx.say("🔕 You will not be pinged when your Minecraft name is mentioned.").await?;
+    } else {
+        ctx.say("🔔 You will be pinged when your Minecraft name is mentioned.").await?;
     }
-
-    if !ctx.data().storage.is_connected_dc(discord_id).await {
-        ctx.say("❌ You must `/connect` your Minecraft account first.")
-            .await?;
-        return Ok(());
-    }
-
-    ctx.data()
-        .storage
-        .set_mute_mention(discord_id, true)
-        .await?;
-    ctx.say("🔕 You will not be pinged when your Minecraft name is mentioned in chat.")
-        .await?;
-    Ok(())
-}
-
-fn unmutemention_help() -> String {
-    String::from("Re-enable cross-chat mention pings.")
-}
-
-/// Re-enable cross-chat mention pings — you will be pinged when your MC name is mentioned.
-///
-/// Requires `/connect` first.
-#[poise::command(slash_command, prefix_command, help_text_fn = unmutemention_help)]
-pub async fn unmutemention(ctx: Context<'_>) -> Result<(), BotError> {
-    let discord_id = ctx.author().id.get();
-    tracing::info!(user = %ctx.author().name, discord_id = %discord_id, "command /unmutemention executed");
-
-    if !ctx.data().storage.is_privacy_enabled().await {
-        ctx.say("❌ Privacy features are currently disabled by the bot owner.")
-            .await?;
-        return Ok(());
-    }
-
-    if !ctx.data().storage.is_connected_dc(discord_id).await {
-        ctx.say("❌ You must `/connect` your Minecraft account first.")
-            .await?;
-        return Ok(());
-    }
-
-    ctx.data()
-        .storage
-        .set_mute_mention(discord_id, false)
-        .await?;
-    ctx.say("🔔 You will be pinged when your Minecraft name is mentioned in chat.")
-        .await?;
     Ok(())
 }
 
@@ -787,7 +726,7 @@ pub async fn privacy(
         "enable" | "on" => {
             ctx.data().storage.set_privacy_enabled(true).await?;
             tracing::info!(user = %ctx.author().name, "privacy features enabled");
-            ctx.say("🔒 **Privacy features enabled.**\n\nDC→MC requires /connect, MC→DC respects /unsub, and cross-chat mentions are active.").await?;
+            ctx.say("🔒 **Privacy features enabled.**\n\nDC→MC requires /connect, MC→DC respects /alerts settings, and cross-chat mentions are active.").await?;
         }
         "disable" | "off" => {
             ctx.data().storage.set_privacy_enabled(false).await?;

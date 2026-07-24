@@ -20,7 +20,7 @@ Unlike traditional bridges, VVV uses direct log-tailing to read Minecraft server
 - **Player Profile Dashboard** — `/profile` shows a multi-page dashboard with NBT player data (health, position, inventory), cumulative and daily stats from redb, and advancement progress — all in one command.
 - **Player Stats** — Play time, deaths, advancements, messages, commands tracked per player with daily breakdowns.
 - **Mention Cross-Translation** — `@DiscordUser` in MC → Discord ping; `@MCPlayer` in Discord → `@playername` in MC.
-- **Privacy Controls** — `/unsub`/`/sub` for join/leave announcements, `/mutemention`/`/unmutemention` for mention muting.
+- **Privacy Controls** — `/alerts join` and `/alerts mentions` toggle join/leave announcements and cross-chat pings.
 - **Admin Tools** — `/connect_admin` (owner only) to manually link accounts, `/mute`/`/unmute` (owner/admin) to block users from sending to the bridge.
 - **Guild Welcome** — Sends a themed embed message to the system channel when a new member joins the Discord server.
 - **Structured Logging** — Full `tracing`-based observability with RFC 3339 timestamps and configurable verbosity (`RUST_LOG`).
@@ -237,10 +237,8 @@ All commands support both `~` prefix (`~ping`) and Slash Commands (`/ping`).
 | `~disconnect` | Unlink your Discord account from Minecraft |
 | `~profile [player]` | View player dashboard with stats, advancements, daily playtime, and inventory |
 | `~leaderboard` | Show the top 10 players by total play time |
-| `~sub` | Opt in to join/leave announcements |
-| `~unsub` | Opt out of join/leave announcements |
-| `~mutemention` | Mute cross-chat mention pings |
-| `~unmutemention` | Re-enable cross-chat mention pings |
+| `~alerts join` | Toggle join/leave activity broadcasts |
+| `~alerts mentions` | Toggle cross-chat mention pings |
 
 ### Owner / Admin
 
